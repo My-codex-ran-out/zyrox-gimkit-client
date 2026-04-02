@@ -157,7 +157,7 @@
 
     .zyrox-chip {
       font-size: 10px;
-      color: #ffd6d6;
+        color: #ffd6d6;
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(255, 91, 91, 0.55);
       border-radius: 999px;
