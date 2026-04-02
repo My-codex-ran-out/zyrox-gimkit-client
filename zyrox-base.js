@@ -66,8 +66,11 @@
 
   const state = {
     visible: true,
+    searchQuery: "",
     enabledModules: new Set(),
     moduleItems: new Map(),
+    modulePanels: new Map(),
+    moduleEntries: [],
     moduleConfig: new Map(),
     listeningForBind: null,
   };
@@ -126,6 +129,12 @@
       cursor: move;
     }
 
+    .zyrox-topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .zyrox-brand { display: flex; align-items: center; gap: 10px; color: var(--zyx-text-strong); }
 
     .zyrox-logo {
@@ -147,6 +156,23 @@
       border-radius: 999px;
       padding: 4px 8px;
       line-height: 1;
+    }
+
+    .zyrox-search {
+      width: 190px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 108, 108, 0.45);
+      background: rgba(10, 8, 8, 0.72);
+      color: #ffe6e6;
+      padding: 0 10px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .zyrox-search:focus {
+      border-color: rgba(255, 130, 130, 0.8);
+      box-shadow: 0 0 0 2px rgba(255, 61, 61, 0.22);
     }
 
     .zyrox-section { display: flex; flex-direction: column; gap: 7px; }
@@ -302,8 +328,13 @@
         <div class="subtitle">${CONFIG.subtitle}</div>
       </div>
     </div>
-    <span class="zyrox-chip">v0.4</span>
+    <div class="zyrox-topbar-right">
+      <input class="zyrox-search" type="text" placeholder="Search utilities..." autocomplete="off" />
+      <span class="zyrox-chip">v0.4</span>
+    </div>
   `;
+
+  const searchInput = topbar.querySelector(".zyrox-search");
 
   const generalSection = document.createElement("section");
   generalSection.className = "zyrox-section";
@@ -383,6 +414,26 @@
     configMenu.classList.remove("hidden");
   }
 
+  function applySearchFilter() {
+    const query = state.searchQuery.trim().toLowerCase();
+
+    for (const entry of state.moduleEntries) {
+      const visible = !query || entry.name.toLowerCase().includes(query);
+      entry.item.style.display = visible ? "" : "none";
+    }
+
+    for (const [panel, meta] of state.modulePanels.entries()) {
+      let visibleCount = 0;
+      for (const moduleName of meta.modules) {
+        const item = state.moduleItems.get(moduleName);
+        if (item && item.style.display !== "none") visibleCount += 1;
+      }
+
+      panel.style.display = visibleCount > 0 ? "" : "none";
+      meta.countEl.textContent = `${visibleCount}`;
+    }
+  }
+
   function buildPanel(name, modules) {
     const panel = document.createElement("section");
     panel.className = "zyrox-panel";
@@ -409,6 +460,7 @@
       item.innerHTML = `<span>${moduleName}</span><span class="zyrox-bind-label">-</span>`;
 
       state.moduleItems.set(moduleName, item);
+      state.moduleEntries.push({ name: moduleName, item, panel });
       moduleCfg(moduleName);
       setBindLabel(item, moduleName);
 
@@ -426,6 +478,7 @@
 
     panel.appendChild(header);
     panel.appendChild(list);
+    state.modulePanels.set(panel, { countEl: count, modules: [...modules] });
     return panel;
   }
 
@@ -433,6 +486,19 @@
     if (!openConfigModule) return;
     state.listeningForBind = openConfigModule;
     setBindBtn.textContent = "Press any key...";
+  });
+
+  searchInput.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    if (event.key === CONFIG.toggleKey) {
+      event.preventDefault();
+      setVisible(false);
+    }
+  });
+
+  searchInput.addEventListener("input", () => {
+    state.searchQuery = searchInput.value;
+    applySearchFilter();
   });
 
   const generalPanels = document.createElement("div");
@@ -462,6 +528,16 @@
     state.visible = nextVisible;
     root.classList.toggle("zyrox-hidden", !nextVisible);
     if (!nextVisible) closeConfig();
+    if (nextVisible) {
+      requestAnimationFrame(() => {
+        searchInput.focus();
+        if (searchInput.value === CONFIG.toggleKey) {
+          searchInput.value = "";
+          state.searchQuery = "";
+          applySearchFilter();
+        }
+      });
+    }
   }
 
   document.addEventListener("keydown", (event) => {
@@ -478,6 +554,7 @@
     }
 
     if (event.key === CONFIG.toggleKey) {
+      event.preventDefault();
       setVisible(!state.visible);
       return;
     }

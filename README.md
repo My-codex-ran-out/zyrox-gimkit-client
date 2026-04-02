@@ -11,4 +11,5 @@ Modern red/black Zyrox menu base for `gimkit.com/join`.
 2. Create a new userscript and paste `zyrox-base.js`.
 3. Open `https://www.gimkit.com/join`.
 4. Press `\` to show/hide the menu.
-5. Right-click a utility to open its config and set a keybind.
+5. The search bar in the top bar auto-focuses when the menu opens and filters utilities live.
+6. Right-click a utility to open its config and set a keybind.
