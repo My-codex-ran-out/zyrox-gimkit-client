@@ -4,7 +4,7 @@ Modern red/black Zyrox menu base for `gimkit.com/join`.
 
 ## Files
 - `example.js`: Reference/example userscript from another project.
-- `zyrox-base.js`: Zyrox menu framework with module panels and per-module config popups.
+- `zyrox-base.js`: Zyrox menu framework with split General + Gamemode-Specific sections, plus per-module config popups.
 
 ## Usage
 1. Install a userscript manager (Tampermonkey/Violentmonkey).

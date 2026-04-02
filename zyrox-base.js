@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox Client (UI Base)
 // @namespace    https://github.com/zyrox
-// @version      0.3.0
+// @version      0.4.0
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -21,40 +21,48 @@
     subtitle: "Client",
   };
 
-  const CATEGORIES = [
-    {
-      name: "Gameplay",
-      modules: ["Auto Answer", "Answer Streak", "Question Preview", "Skip Animation", "Instant Continue"],
+  const MENU_LAYOUT = {
+    general: {
+      title: "General",
+      modules: [
+        "Auto Answer",
+        "Answer Streak",
+        "ESP",
+        "Question Preview",
+        "Skip Animation",
+        "Instant Continue",
+        "HUD",
+        "Notifications",
+        "Session Timer",
+        "Hotkeys",
+      ],
     },
-    {
-      name: "Economy",
-      modules: ["Auto Purchase", "Priority Upgrades", "Shop Presets", "Auto Save Loadout", "Quick Sell"],
+    gamemodeSpecific: {
+      title: "Gamemode Specific",
+      groups: [
+        {
+          name: "Classic",
+          modules: ["Classic Auto Buy", "Classic Streak Manager", "Classic Speed Round"],
+        },
+        {
+          name: "Team Mode",
+          modules: ["Team Comms Overlay", "Team Upgrade Sync", "Team Split Strategy"],
+        },
+        {
+          name: "Capture The Flag",
+          modules: ["Flag Pathing", "Flag Return Alert", "Carrier Tracker"],
+        },
+        {
+          name: "Tag: Domination",
+          modules: ["Zone Priority", "Tag Timer Overlay", "Defense Rotation"],
+        },
+        {
+          name: "The Floor Is Lava",
+          modules: ["Safe Tile Highlight", "Lava Cycle Timer", "Route Assist"],
+        },
+      ],
     },
-    {
-      name: "Automation",
-      modules: ["Auto Ready", "Auto Requeue", "Auto Respawn", "Idle Prevention", "Smart Delay"],
-    },
-    {
-      name: "Lobby",
-      modules: ["Name Presets", "Join Shortcuts", "Party Helper", "Host Tools", "Code History"],
-    },
-    {
-      name: "Visual",
-      modules: ["HUD", "Overlay", "Theme", "Compact Cards", "Minimal Labels"],
-    },
-    {
-      name: "QoL",
-      modules: ["Hotkeys", "Notifications", "Session Timer", "Clipboard Tools", "Menu Lock"],
-    },
-    {
-      name: "Profiles",
-      modules: ["Config Slots", "Import Config", "Export Config", "Quick Reset", "Cloud Sync"],
-    },
-    {
-      name: "Debug",
-      modules: ["Event Log", "State Viewer", "Latency Meter"],
-    },
-  ];
+  };
 
   const state = {
     visible: true,
@@ -67,17 +75,11 @@
   const style = document.createElement("style");
   style.textContent = `
     :root {
-      --zyx-bg: rgba(10, 10, 12, 0.84);
-      --zyx-bg-strong: rgba(7, 7, 9, 0.95);
-      --zyx-panel: rgba(18, 18, 22, 0.88);
-      --zyx-panel-hover: rgba(30, 30, 36, 0.9);
       --zyx-border: rgba(255, 58, 58, 0.35);
       --zyx-border-soft: rgba(255, 255, 255, 0.12);
       --zyx-text: #d6d6df;
-      --zyx-text-strong: #ffffff;
+      --zyx-text-strong: #fff;
       --zyx-muted: #9b9bab;
-      --zyx-accent: #ff3d3d;
-      --zyx-accent-soft: rgba(255, 61, 61, 0.24);
       --zyx-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
       --zyx-radius-xl: 14px;
       --zyx-radius-lg: 12px;
@@ -96,11 +98,7 @@
       font-family: var(--zyx-font);
     }
 
-    .zyrox-root * {
-      box-sizing: border-box;
-      font-family: inherit;
-    }
-
+    .zyrox-root * { box-sizing: border-box; font-family: inherit; }
     .zyrox-hidden { display: none !important; }
 
     .zyrox-shell {
@@ -128,41 +126,36 @@
       cursor: move;
     }
 
-    .zyrox-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--zyx-text-strong);
-    }
+    .zyrox-brand { display: flex; align-items: center; gap: 10px; color: var(--zyx-text-strong); }
 
     .zyrox-logo {
       width: 18px;
       height: 18px;
       border-radius: 6px;
       background: radial-gradient(circle at 30% 30%, #ff8b8b 0%, #ff3d3d 45%, #c31818 100%);
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 0 18px rgba(255, 61, 61, 0.45);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 0 18px rgba(255,61,61,.45);
     }
 
-    .zyrox-brand .title {
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1;
-    }
-
-    .zyrox-brand .subtitle {
-      font-size: 11px;
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.7);
-    }
+    .zyrox-brand .title { font-size: 13px; font-weight: 700; line-height: 1; }
+    .zyrox-brand .subtitle { font-size: 11px; font-weight: 500; color: rgba(255,255,255,.7); }
 
     .zyrox-chip {
       font-size: 10px;
-        color: #ffd6d6;
+      color: #ffd6d6;
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(255, 91, 91, 0.55);
       border-radius: 999px;
       padding: 4px 8px;
       line-height: 1;
+    }
+
+    .zyrox-section { display: flex; flex-direction: column; gap: 7px; }
+    .zyrox-section-label {
+      font-size: 11px;
+      letter-spacing: 0.25px;
+      color: #ffb0b0;
+      padding-left: 2px;
+      text-transform: uppercase;
     }
 
     .zyrox-panels {
@@ -175,10 +168,7 @@
     }
 
     .zyrox-panels::-webkit-scrollbar { height: 8px; }
-    .zyrox-panels::-webkit-scrollbar-thumb {
-      background: rgba(255, 61, 61, 0.3);
-      border-radius: 999px;
-    }
+    .zyrox-panels::-webkit-scrollbar-thumb { background: rgba(255, 61, 61, 0.3); border-radius: 999px; }
 
     .zyrox-panel {
       width: 212px;
@@ -211,14 +201,7 @@
       line-height: 1;
     }
 
-    .zyrox-module-list {
-      margin: 0;
-      padding: 7px;
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
+    .zyrox-module-list { margin: 0; padding: 7px; list-style: none; display: flex; flex-direction: column; gap: 5px; }
 
     .zyrox-module {
       min-height: 30px;
@@ -233,15 +216,15 @@
       border: 1px solid transparent;
       border-radius: var(--zyx-radius-md);
       background: rgba(255, 255, 255, 0.03);
-      transition: transform 0.11s ease, background 0.11s ease, border-color 0.11s ease, color 0.11s ease;
+      transition: transform .11s ease, background .11s ease, border-color .11s ease, color .11s ease;
       cursor: pointer;
       white-space: nowrap;
     }
 
     .zyrox-module:hover {
-      background: var(--zyx-panel-hover);
+      background: rgba(30, 30, 36, 0.9);
       border-color: rgba(255, 255, 255, 0.14);
-      color: var(--zyx-text-strong);
+      color: #fff;
       transform: translateX(2px);
     }
 
@@ -284,35 +267,11 @@
     }
 
     .zyrox-config.hidden { display: none !important; }
-
-    .zyrox-config-header {
-      padding: 9px 11px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-      background: linear-gradient(90deg, rgba(255, 61, 61, 0.23), rgba(45, 12, 12, 0.95));
-    }
-
-    .zyrox-config-title {
-      color: #fff;
-      font-size: 12px;
-      font-weight: 700;
-      margin-bottom: 2px;
-    }
-
-    .zyrox-config-sub {
-      color: #b8b8c2;
-      font-size: 10px;
-    }
-
+    .zyrox-config-header { padding: 9px 11px; border-bottom: 1px solid rgba(255,255,255,.09); background: linear-gradient(90deg, rgba(255, 61, 61, .23), rgba(45, 12, 12, .95)); }
+    .zyrox-config-title { color: #fff; font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+    .zyrox-config-sub { color: #b8b8c2; font-size: 10px; }
     .zyrox-config-body { padding: 10px; }
-
-    .zyrox-config-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      color: #d8d8df;
-      font-size: 12px;
-    }
+    .zyrox-config-row { display:flex; justify-content:space-between; align-items:center; gap:8px; color:#d8d8df; font-size:12px; }
 
     .zyrox-btn {
       border: 1px solid rgba(255, 94, 94, 0.5);
@@ -324,10 +283,7 @@
       cursor: pointer;
     }
 
-    .zyrox-btn:hover {
-      background: rgba(255, 61, 61, 0.2);
-      color: #fff;
-    }
+    .zyrox-btn:hover { background: rgba(255, 61, 61, 0.2); color: #fff; }
   `;
 
   const root = document.createElement("div");
@@ -346,11 +302,16 @@
         <div class="subtitle">${CONFIG.subtitle}</div>
       </div>
     </div>
-    <span class="zyrox-chip">v0.3</span>
+    <span class="zyrox-chip">v0.4</span>
   `;
 
-  const panelsWrap = document.createElement("div");
-  panelsWrap.className = "zyrox-panels";
+  const generalSection = document.createElement("section");
+  generalSection.className = "zyrox-section";
+  generalSection.innerHTML = `<div class="zyrox-section-label">General</div>`;
+
+  const gamemodeSection = document.createElement("section");
+  gamemodeSection.className = "zyrox-section";
+  gamemodeSection.innerHTML = `<div class="zyrox-section-label">Gamemode Specific</div>`;
 
   const footer = document.createElement("div");
   footer.className = "zyrox-footer";
@@ -422,13 +383,7 @@
     configMenu.classList.remove("hidden");
   }
 
-  setBindBtn.addEventListener("click", () => {
-    if (!openConfigModule) return;
-    state.listeningForBind = openConfigModule;
-    setBindBtn.textContent = "Press any key...";
-  });
-
-  for (const category of CATEGORIES) {
+  function buildPanel(name, modules) {
     const panel = document.createElement("section");
     panel.className = "zyrox-panel";
 
@@ -436,11 +391,11 @@
     header.className = "zyrox-panel-header";
 
     const title = document.createElement("span");
-    title.textContent = category.name;
+    title.textContent = name;
 
     const count = document.createElement("span");
     count.className = "zyrox-panel-count";
-    count.textContent = `${category.modules.length}`;
+    count.textContent = `${modules.length}`;
 
     header.appendChild(title);
     header.appendChild(count);
@@ -448,7 +403,7 @@
     const list = document.createElement("ul");
     list.className = "zyrox-module-list";
 
-    for (const moduleName of category.modules) {
+    for (const moduleName of modules) {
       const item = document.createElement("li");
       item.className = "zyrox-module";
       item.innerHTML = `<span>${moduleName}</span><span class="zyrox-bind-label">-</span>`;
@@ -471,11 +426,30 @@
 
     panel.appendChild(header);
     panel.appendChild(list);
-    panelsWrap.appendChild(panel);
+    return panel;
   }
 
+  setBindBtn.addEventListener("click", () => {
+    if (!openConfigModule) return;
+    state.listeningForBind = openConfigModule;
+    setBindBtn.textContent = "Press any key...";
+  });
+
+  const generalPanels = document.createElement("div");
+  generalPanels.className = "zyrox-panels";
+  generalPanels.appendChild(buildPanel(MENU_LAYOUT.general.title, MENU_LAYOUT.general.modules));
+  generalSection.appendChild(generalPanels);
+
+  const gamemodePanels = document.createElement("div");
+  gamemodePanels.className = "zyrox-panels";
+  for (const gm of MENU_LAYOUT.gamemodeSpecific.groups) {
+    gamemodePanels.appendChild(buildPanel(gm.name, gm.modules));
+  }
+  gamemodeSection.appendChild(gamemodePanels);
+
   shell.appendChild(topbar);
-  shell.appendChild(panelsWrap);
+  shell.appendChild(generalSection);
+  shell.appendChild(gamemodeSection);
   shell.appendChild(footer);
 
   root.appendChild(shell);
