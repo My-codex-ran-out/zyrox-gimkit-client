@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      0.8.0
+// @version      0.8.1
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -16,9 +16,28 @@
   "use strict";
 
   // Some userscript runtimes execute bundled code that expects a global `Module`
-  // constructor (e.g. `new Module(...)`). Provide a minimal callable fallback.
+  // with `enable/disable` methods. Provide a minimal compatible fallback.
   if (typeof globalThis.Module === "undefined") {
-    globalThis.Module = function Module() {};
+    globalThis.Module = class Module {
+      constructor(name = "Module", options = {}) {
+        this.name = name;
+        this.enabled = false;
+        this.onEnable = typeof options.onEnable === "function" ? options.onEnable : () => {};
+        this.onDisable = typeof options.onDisable === "function" ? options.onDisable : () => {};
+      }
+
+      enable() {
+        if (this.enabled) return;
+        this.enabled = true;
+        this.onEnable();
+      }
+
+      disable() {
+        if (!this.enabled) return;
+        this.enabled = false;
+        this.onDisable();
+      }
+    };
   }
 
   if (window.__ZYROX_UI_MOUNTED__) return;
@@ -26,7 +45,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "0.8.0";
+    const CLIENT_VERSION = "0.8.1";
     return CLIENT_VERSION;
   }
 
@@ -1272,6 +1291,8 @@
   const settingsTabs = [...settingsMenu.querySelectorAll(".zyrox-settings-tab")];
   const settingsPanes = [...settingsMenu.querySelectorAll(".zyrox-settings-pane")];
   const configBody = configMenu.querySelector(".zyrox-config-body");
+  // Backward-compat alias for legacy code paths that still reference this identifier.
+  const setBindButtonEl = configMenu.querySelector(".set-bind-btn");
   const settingsMenuKeyBtn = settingsMenu.querySelector(".settings-menu-key");
   const settingsMenuKeyResetBtn = settingsMenu.querySelector(".settings-menu-key-reset");
   const settingsTopCloseBtn = settingsMenu.querySelector(".settings-close-top");
@@ -1320,7 +1341,7 @@
   let currentResetBindBtn = null;
 
   function setBindButtonText(text) {
-    const bindButton = currentSetBindBtn || configMenu.querySelector(".set-bind-btn");
+    const bindButton = currentSetBindBtn || setBindButtonEl || configMenu.querySelector(".set-bind-btn");
     if (bindButton) bindButton.textContent = text;
   }
 
@@ -1330,26 +1351,6 @@
       .flatMap((group) => group.modules || [])
       .find((mod) => typeof mod === "object" && mod && mod.name === moduleName);
     return found || null;
-  }
-
-  function ensureModuleConfigStore() {
-    if (state.moduleConfig instanceof Map) return state.moduleConfig;
-
-    const recovered = new Map();
-    if (state.moduleConfig && typeof state.moduleConfig === "object") {
-      for (const [moduleName, cfg] of Object.entries(state.moduleConfig)) {
-        if (cfg && typeof cfg === "object") {
-          recovered.set(moduleName, { keybind: cfg.keybind || null });
-        }
-      }
-    }
-    state.moduleConfig = recovered;
-    return state.moduleConfig;
-  }
-
-  function setBindButtonText(text) {
-    const bindButton = setBindButtonEl || configMenu.querySelector(".zyrox-btn:not(.zyrox-btn-square)");
-    if (bindButton) bindButton.textContent = text;
   }
 
   function ensureModuleConfigStore() {
