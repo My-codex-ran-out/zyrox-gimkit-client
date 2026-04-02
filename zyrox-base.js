@@ -1271,8 +1271,7 @@
   const configCloseBtn = configMenu.querySelector(".config-close-btn");
   const settingsTabs = [...settingsMenu.querySelectorAll(".zyrox-settings-tab")];
   const settingsPanes = [...settingsMenu.querySelectorAll(".zyrox-settings-pane")];
-  const resetBindBtn = configMenu.querySelector(".zyrox-btn-square");
-  const setBindButtonEl = configMenu.querySelector(".zyrox-btn:not(.zyrox-btn-square)");
+  const configBody = configMenu.querySelector(".zyrox-config-body");
   const settingsMenuKeyBtn = settingsMenu.querySelector(".settings-menu-key");
   const settingsMenuKeyResetBtn = settingsMenu.querySelector(".settings-menu-key-reset");
   const settingsTopCloseBtn = settingsMenu.querySelector(".settings-close-top");
@@ -1317,6 +1316,36 @@
   const panelByName = new Map();
   const panelCollapseButtons = new Map();
   let openConfigModule = null;
+  let currentSetBindBtn = null;
+  let currentResetBindBtn = null;
+
+  function setBindButtonText(text) {
+    const bindButton = currentSetBindBtn || configMenu.querySelector(".set-bind-btn");
+    if (bindButton) bindButton.textContent = text;
+  }
+
+  function getModuleLayoutConfig(moduleName) {
+    const allGroups = [...MENU_LAYOUT.general.groups, ...MENU_LAYOUT.gamemodeSpecific.groups];
+    const found = allGroups
+      .flatMap((group) => group.modules || [])
+      .find((mod) => typeof mod === "object" && mod && mod.name === moduleName);
+    return found || null;
+  }
+
+  function ensureModuleConfigStore() {
+    if (state.moduleConfig instanceof Map) return state.moduleConfig;
+
+    const recovered = new Map();
+    if (state.moduleConfig && typeof state.moduleConfig === "object") {
+      for (const [moduleName, cfg] of Object.entries(state.moduleConfig)) {
+        if (cfg && typeof cfg === "object") {
+          recovered.set(moduleName, { keybind: cfg.keybind || null });
+        }
+      }
+    }
+    state.moduleConfig = recovered;
+    return state.moduleConfig;
+  }
 
   function setBindButtonText(text) {
     const bindButton = setBindButtonEl || configMenu.querySelector(".zyrox-btn:not(.zyrox-btn-square)");
@@ -1341,7 +1370,14 @@
   function moduleCfg(name) {
     const store = ensureModuleConfigStore();
     if (!store.has(name)) {
-      store.set(name, { keybind: null });
+      const layout = getModuleLayoutConfig(name);
+      const settings = {};
+      if (layout && Array.isArray(layout.settings)) {
+        for (const setting of layout.settings) {
+          settings[setting.id] = setting.default ?? setting.min ?? 0;
+        }
+      }
+      store.set(name, { keybind: null, ...settings });
     }
     return store.get(name);
   }
@@ -1378,6 +1414,64 @@
   function openConfig(moduleName) {
     openConfigModule = moduleName;
     const cfg = moduleCfg(moduleName);
+    const moduleLayout = getModuleLayoutConfig(moduleName);
+
+    configBody.innerHTML = `
+      <div class="zyrox-config-row">
+        <span>Keybind</span>
+        <div class="zyrox-config-actions">
+          <button class="zyrox-btn zyrox-btn-square reset-bind-btn" type="button" title="Reset keybind">↺</button>
+          <button class="zyrox-btn set-bind-btn" type="button">Set keybind</button>
+        </div>
+      </div>
+    `;
+
+    currentResetBindBtn = configMenu.querySelector(".reset-bind-btn");
+    currentSetBindBtn = configMenu.querySelector(".set-bind-btn");
+
+    if (currentSetBindBtn) {
+      currentSetBindBtn.addEventListener("click", () => {
+        if (!openConfigModule) return;
+        state.listeningForBind = openConfigModule;
+        setBindButtonText("Press any key...");
+      });
+    }
+
+    if (currentResetBindBtn) {
+      currentResetBindBtn.addEventListener("click", () => {
+        if (!openConfigModule) return;
+        const activeCfg = moduleCfg(openConfigModule);
+        activeCfg.keybind = null;
+        const item = state.moduleItems.get(openConfigModule);
+        if (item) setBindLabel(item, openConfigModule);
+        configSubEl.textContent = "No keybind assigned";
+        state.listeningForBind = null;
+        setBindButtonText("Set keybind");
+      });
+    }
+
+    if (moduleLayout && Array.isArray(moduleLayout.settings)) {
+      for (const setting of moduleLayout.settings) {
+        const settingCard = document.createElement("div");
+        settingCard.className = "zyrox-setting-card";
+
+        if (setting.type === "slider") {
+          if (cfg[setting.id] === undefined) cfg[setting.id] = setting.default ?? setting.min ?? 0;
+          settingCard.innerHTML = `
+            <label>${setting.label}</label>
+            <input type="range" class="set-module-setting" data-setting-id="${setting.id}" min="${setting.min}" max="${setting.max}" step="${setting.step}" value="${cfg[setting.id]}" />
+          `;
+          const settingInput = settingCard.querySelector(".set-module-setting");
+          if (settingInput) {
+            settingInput.addEventListener("input", (event) => {
+              cfg[setting.id] = Number(event.target.value);
+            });
+          }
+        }
+
+        if (settingCard.innerHTML.trim()) configBody.appendChild(settingCard);
+      }
+    }
 
     configTitleEl.textContent = moduleName;
     configSubEl.textContent = cfg.keybind ? `Current bind: ${cfg.keybind}` : "No keybind assigned";
@@ -1740,8 +1834,9 @@
     const list = document.createElement("ul");
     list.className = "zyrox-module-list";
 
-    for (const moduleEntry of modules) {
-      const moduleName = typeof moduleEntry === 'object' ? moduleEntry.name : moduleEntry;
+    for (const moduleDef of modules) {
+      const moduleName = typeof moduleDef === "string" ? moduleDef : moduleDef?.name;
+      if (!moduleName) continue;
       const item = document.createElement("li");
       item.className = "zyrox-module";
       item.innerHTML = `<span>${moduleName}</span><span class="zyrox-bind-label">-</span>`;
@@ -1778,14 +1873,6 @@
     return panel;
   }
 
-  if (setBindButtonEl) {
-    setBindButtonEl.addEventListener("click", () => {
-      if (!openConfigModule) return;
-      state.listeningForBind = openConfigModule;
-      setBindButtonText("Press any key...");
-    });
-  }
-
   settingsMenuKeyBtn.addEventListener("click", () => {
     state.listeningForMenuBind = true;
     settingsMenuKeyBtn.textContent = "Press key...";
@@ -1813,17 +1900,6 @@
       for (const t of settingsTabs) t.classList.toggle("active", t === tab);
       for (const pane of settingsPanes) pane.classList.toggle("hidden", pane.dataset.pane !== target);
     });
-  });
-
-  resetBindBtn.addEventListener("click", () => {
-    if (!openConfigModule) return;
-    const cfg = moduleCfg(openConfigModule);
-    cfg.keybind = null;
-    const item = state.moduleItems.get(openConfigModule);
-    if (item) setBindLabel(item, openConfigModule);
-    configSubEl.textContent = "No keybind assigned";
-    state.listeningForBind = null;
-    setBindButtonText("Set keybind");
   });
 
   searchInput.addEventListener("keydown", (event) => {
