@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      0.7.1
+// @version      0.7.2
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -20,7 +20,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "0.7.1";
+    const CLIENT_VERSION = "0.7.2";
     return CLIENT_VERSION;
   }
 
@@ -1052,7 +1052,16 @@
   }
 
   function setDisplayMode(mode) {
-    state.displayMode = mode === "loose" ? "loose" : "merged";
+    const nextMode = mode === "loose" ? "loose" : "merged";
+
+    if (nextMode === "loose" && !state.looseInitialized) {
+      // Capture while still in merged flow layout so the first loose layout mirrors merged positions.
+      shell.classList.remove("loose-mode");
+      captureLoosePanelPositionsFromMerged();
+      state.looseInitialized = true;
+    }
+
+    state.displayMode = nextMode;
     shell.classList.toggle("loose-mode", state.displayMode === "loose");
 
     for (const btn of displayModeButtons) {
@@ -1060,11 +1069,6 @@
     }
 
     if (state.displayMode === "loose") {
-      if (!state.looseInitialized) {
-        captureLoosePanelPositionsFromMerged();
-        state.looseInitialized = true;
-      }
-
       state.mergedRootPosition = {
         left: parseInt(root.style.left || "20", 10),
         top: parseInt(root.style.top || "28", 10),
