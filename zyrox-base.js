@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      0.6.3
+// @version      0.6.4
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -20,7 +20,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "0.6.3";
+    const CLIENT_VERSION = "0.6.4";
     return CLIENT_VERSION;
   }
 
@@ -90,7 +90,9 @@
     moduleConfig: new Map(),
     listeningForBind: null,
     listeningForMenuBind: false,
+    searchAutofocus: true,
   };
+  const STORAGE_KEY = "zyrox_client_settings_v1";
 
   const style = document.createElement("style");
   style.textContent = `
@@ -118,6 +120,9 @@
       --zyx-settings-subtext: #c2c2ce;
       --zyx-settings-card-bg: rgba(255,255,255,.03);
       --zyx-settings-card-border: rgba(255,255,255,.08);
+      --zyx-accent-soft: #ffbdbd;
+      --zyx-search-text: #ffe6e6;
+      --zyx-hover-shift: 2px;
       --zyx-shell-blur: 10px;
       --zyx-muted: #9b9bab;
       --zyx-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
@@ -151,7 +156,7 @@
       height: 640px;
       border-radius: var(--zyx-radius-xl);
       border: 1px solid var(--zyx-border-soft);
-      background: linear-gradient(150deg, rgba(255, 54, 54, 0.08), rgba(0, 0, 0, 0.45));
+      background: linear-gradient(150deg, #ff3d3d22, rgba(0, 0, 0, 0.45));
       backdrop-filter: blur(var(--zyx-shell-blur)) saturate(115%);
       box-shadow: var(--zyx-shadow);
       overflow: auto;
@@ -192,7 +197,7 @@
 
     .zyrox-chip {
       font-size: 10px;
-      color: #ffd6d6;
+      color: var(--zyx-settings-text);
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--zyx-outline-color);
       border-radius: 999px;
@@ -233,7 +238,7 @@
       border-radius: 8px;
       border: 1px solid var(--zyx-outline-color);
       background: rgba(10, 8, 8, 0.72);
-      color: #ffe6e6;
+      color: var(--zyx-search-text);
       padding: 0 10px;
       font-size: 12px;
       outline: none;
@@ -248,7 +253,7 @@
     .zyrox-section-label {
       font-size: 11px;
       letter-spacing: 0.25px;
-      color: #ffb0b0;
+      color: var(--zyx-accent-soft);
       padding-left: 2px;
       text-transform: uppercase;
     }
@@ -322,8 +327,8 @@
     .zyrox-module:hover {
       background: rgba(30, 30, 36, 0.9);
       border-color: rgba(255, 255, 255, 0.14);
-      color: #fff;
-      transform: translateX(2px);
+      color: var(--zyx-settings-text);
+      transform: translateX(var(--zyx-hover-shift));
     }
 
     .zyrox-module.active {
@@ -461,16 +466,20 @@
     .zyrox-setting-card input[type='color'] { width: 52px; height: 30px; border: none; background: transparent; cursor: pointer; }
     .zyrox-setting-card input[type='range'] { width: 190px; accent-color: var(--zyx-slider-color); }
     .zyrox-gradient-pair { display: inline-flex; align-items: center; gap: 8px; }
+    .zyrox-preset-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+    .zyrox-preset-btn { border: 1px solid var(--zyx-outline-color); background: rgba(0,0,0,.26); color: var(--zyx-settings-text); border-radius: 8px; padding: 6px 10px; font-size: 11px; cursor: pointer; }
+    .zyrox-preset-btn:hover { background: rgba(255, 61, 61, 0.15); }
     .zyrox-subheading {
       grid-column: 1 / -1;
       font-size: 11px;
       text-transform: uppercase;
       letter-spacing: 0.25px;
-      color: #ffbdbd;
+      color: var(--zyx-accent-soft);
       margin-top: -2px;
       margin-bottom: -4px;
     }
-    .zyrox-settings-actions { display:flex; justify-content:flex-end; gap:8px; padding: 0 14px 14px; }
+    .zyrox-settings-actions { display:flex; justify-content:space-between; gap:8px; padding: 0 14px 14px; }
+    .zyrox-settings-actions-group { display:flex; gap:8px; }
     .zyrox-close-btn {
       position: absolute;
       top: 10px;
@@ -580,19 +589,37 @@
       </div>
       <div class="zyrox-settings-pane" data-pane="controls">
         <div class="zyrox-settings-body">
+          <div class="zyrox-subheading">Menu</div>
           <div class="zyrox-setting-card">
             <label>Menu Toggle Key</label>
             <button class="zyrox-keybind-btn settings-menu-key" type="button">Menu Key: ${CONFIG.toggleKey}</button>
             <button class="zyrox-btn zyrox-btn-square settings-menu-key-reset" type="button" title="Reset menu key">↺</button>
           </div>
+          <div class="zyrox-subheading">Search</div>
+          <div class="zyrox-setting-card">
+            <label>Auto Focus Search</label>
+            <input type="checkbox" class="set-search-autofocus" checked />
+          </div>
         </div>
       </div>
       <div class="zyrox-settings-pane hidden" data-pane="theme">
         <div class="zyrox-settings-body">
+          <div class="zyrox-preset-row">
+            <button type="button" class="zyrox-preset-btn" data-preset="default">Default</button>
+            <button type="button" class="zyrox-preset-btn" data-preset="green">Green</button>
+            <button type="button" class="zyrox-preset-btn" data-preset="ice">Ice</button>
+          </div>
           <div class="zyrox-subheading">Main Window</div>
           <div class="zyrox-setting-card">
             <label>Accent Color</label>
             <input type="color" class="set-accent" value="#ff3d3d" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Background Gradient</label>
+            <span class="zyrox-gradient-pair">
+              <input type="color" class="set-shell-bg-start" value="#ff3d3d" />
+              <input type="color" class="set-shell-bg-end" value="#000000" />
+            </span>
           </div>
           <div class="zyrox-setting-card">
             <label>Top Bar Color</label>
@@ -618,6 +645,19 @@
           <div class="zyrox-setting-card">
             <label>Slider Color</label>
             <input type="color" class="set-slider-color" value="#ff6b6b" />
+          </div>
+          <div class="zyrox-subheading">Typography</div>
+          <div class="zyrox-setting-card">
+            <label>Muted Text</label>
+            <input type="color" class="set-muted-text" value="#9b9bab" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Label Accent</label>
+            <input type="color" class="set-accent-soft" value="#ffbdbd" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Search Text</label>
+            <input type="color" class="set-search-text" value="#ffe6e6" />
           </div>
           <div class="zyrox-subheading">Icons & Badges</div>
           <div class="zyrox-setting-card">
@@ -684,6 +724,7 @@
       </div>
       <div class="zyrox-settings-pane hidden" data-pane="appearance">
         <div class="zyrox-settings-body">
+          <div class="zyrox-subheading">Layout</div>
           <div class="zyrox-setting-card">
             <label>UI Scale</label>
             <input type="range" class="set-scale" min="80" max="130" value="100" />
@@ -696,12 +737,22 @@
             <label>Panel Blur</label>
             <input type="range" class="set-blur" min="0" max="16" value="10" />
           </div>
+          <div class="zyrox-subheading">Motion</div>
+          <div class="zyrox-setting-card">
+            <label>Module Hover Shift</label>
+            <input type="range" class="set-hover-shift" min="0" max="6" value="2" />
+          </div>
         </div>
       </div>
     </div>
     <div class="zyrox-settings-actions">
-      <button class="zyrox-btn settings-reset" type="button">Reset Appearance</button>
-      <button class="zyrox-btn settings-close" type="button">Close</button>
+      <div class="zyrox-settings-actions-group">
+        <button class="zyrox-btn settings-reset" type="button">Reset Appearance</button>
+      </div>
+      <div class="zyrox-settings-actions-group">
+        <button class="zyrox-btn settings-save" type="button">Save</button>
+        <button class="zyrox-btn settings-close" type="button">Close</button>
+      </div>
     </div>
   `;
   configBackdrop.appendChild(settingsMenu);
@@ -716,7 +767,12 @@
   const settingsMenuKeyBtn = settingsMenu.querySelector(".settings-menu-key");
   const settingsMenuKeyResetBtn = settingsMenu.querySelector(".settings-menu-key-reset");
   const settingsTopCloseBtn = settingsMenu.querySelector(".settings-close-top");
+  const settingsSaveBtn = settingsMenu.querySelector(".settings-save");
+  const presetButtons = [...settingsMenu.querySelectorAll(".zyrox-preset-btn")];
+  const searchAutofocusInput = settingsMenu.querySelector(".set-search-autofocus");
   const accentInput = settingsMenu.querySelector(".set-accent");
+  const shellBgStartInput = settingsMenu.querySelector(".set-shell-bg-start");
+  const shellBgEndInput = settingsMenu.querySelector(".set-shell-bg-end");
   const topbarColorInput = settingsMenu.querySelector(".set-topbar-color");
   const iconColorInput = settingsMenu.querySelector(".set-icon-color");
   const outlineColorInput = settingsMenu.querySelector(".set-outline-color");
@@ -727,6 +783,9 @@
   const textInput = settingsMenu.querySelector(".set-text");
   const opacityInput = settingsMenu.querySelector(".set-opacity");
   const sliderColorInput = settingsMenu.querySelector(".set-slider-color");
+  const mutedTextInput = settingsMenu.querySelector(".set-muted-text");
+  const accentSoftInput = settingsMenu.querySelector(".set-accent-soft");
+  const searchTextInput = settingsMenu.querySelector(".set-search-text");
   const headerStartInput = settingsMenu.querySelector(".set-header-start");
   const headerEndInput = settingsMenu.querySelector(".set-header-end");
   const headerTextInput = settingsMenu.querySelector(".set-header-text");
@@ -741,6 +800,7 @@
   const scaleInput = settingsMenu.querySelector(".set-scale");
   const radiusInput = settingsMenu.querySelector(".set-radius");
   const blurInput = settingsMenu.querySelector(".set-blur");
+  const hoverShiftInput = settingsMenu.querySelector(".set-hover-shift");
   const settingsResetBtn = settingsMenu.querySelector(".settings-reset");
   const settingsCloseBtn = settingsMenu.querySelector(".settings-close");
   let openConfigModule = null;
@@ -799,6 +859,76 @@
     configMenu.classList.add("hidden");
   }
 
+  function collectSettings() {
+    return {
+      toggleKey: CONFIG.toggleKey,
+      searchAutofocus: searchAutofocusInput.checked,
+      accent: accentInput.value,
+      shellBgStart: shellBgStartInput.value,
+      shellBgEnd: shellBgEndInput.value,
+      topbarColor: topbarColorInput.value,
+      iconColor: iconColorInput.value,
+      outlineColor: outlineColorInput.value,
+      panelCountText: panelCountTextInput.value,
+      panelCountBorder: panelCountBorderInput.value,
+      panelCountBg: panelCountBgInput.value,
+      border: borderInput.value,
+      text: textInput.value,
+      opacity: opacityInput.value,
+      sliderColor: sliderColorInput.value,
+      mutedText: mutedTextInput.value,
+      accentSoft: accentSoftInput.value,
+      searchText: searchTextInput.value,
+      headerStart: headerStartInput.value,
+      headerEnd: headerEndInput.value,
+      headerText: headerTextInput.value,
+      settingsHeaderStart: settingsHeaderStartInput.value,
+      settingsHeaderEnd: settingsHeaderEndInput.value,
+      settingsSidebar: settingsSidebarInput.value,
+      settingsBody: settingsBodyInput.value,
+      settingsText: settingsTextInput.value,
+      settingsSubtext: settingsSubtextInput.value,
+      settingsCardBorder: settingsCardBorderInput.value,
+      settingsCardBg: settingsCardBgInput.value,
+      scale: scaleInput.value,
+      radius: radiusInput.value,
+      blur: blurInput.value,
+      hoverShift: hoverShiftInput.value,
+    };
+  }
+
+  function applyPreset(presetName) {
+    if (presetName === "green") {
+      accentInput.value = "#2dff75";
+      shellBgStartInput.value = "#2dff75";
+      topbarColorInput.value = "#35d96d";
+      borderInput.value = "#5dff9a";
+      outlineColorInput.value = "#37d878";
+      headerStartInput.value = "#2dff75";
+      headerEndInput.value = "#0f2f1b";
+      sliderColorInput.value = "#2dff75";
+    } else if (presetName === "ice") {
+      accentInput.value = "#6cd8ff";
+      shellBgStartInput.value = "#6cd8ff";
+      topbarColorInput.value = "#58bff1";
+      borderInput.value = "#8ae4ff";
+      outlineColorInput.value = "#6fbce8";
+      headerStartInput.value = "#6cd8ff";
+      headerEndInput.value = "#133042";
+      sliderColorInput.value = "#7bdfff";
+    } else {
+      accentInput.value = "#ff3d3d";
+      shellBgStartInput.value = "#ff3d3d";
+      topbarColorInput.value = "#ff4a4a";
+      borderInput.value = "#ff6f6f";
+      outlineColorInput.value = "#ff5b5b";
+      headerStartInput.value = "#ff4a4a";
+      headerEndInput.value = "#3c1212";
+      sliderColorInput.value = "#ff6b6b";
+    }
+    applyAppearance();
+  }
+
   function applyAppearance() {
     const toRgba = (hex, alpha) => {
       const h = hex.replace("#", "");
@@ -815,7 +945,8 @@
       return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
     };
 
-    const accent = accentInput.value;
+    const shellBgStart = shellBgStartInput.value;
+    const shellBgEnd = shellBgEndInput.value;
     const topbarColor = topbarColorInput.value;
     const iconColor = iconColorInput.value;
     const outlineColor = outlineColorInput.value;
@@ -826,6 +957,9 @@
     const text = textInput.value;
     const opacity = Number(opacityInput.value) / 100;
     const sliderColor = sliderColorInput.value;
+    const mutedText = mutedTextInput.value;
+    const accentSoft = accentSoftInput.value;
+    const searchText = searchTextInput.value;
     const headerStart = headerStartInput.value;
     const headerEnd = headerEndInput.value;
     const headerText = headerTextInput.value;
@@ -840,9 +974,13 @@
     const scale = Number(scaleInput.value) / 100;
     const radius = Number(radiusInput.value);
     const blur = Number(blurInput.value);
+    const hoverShift = Number(hoverShiftInput.value);
     const cssRoot = document.documentElement.style;
     cssRoot.setProperty("--zyx-border", `${border}99`);
     cssRoot.setProperty("--zyx-text", text);
+    cssRoot.setProperty("--zyx-muted", mutedText);
+    cssRoot.setProperty("--zyx-accent-soft", accentSoft);
+    cssRoot.setProperty("--zyx-search-text", searchText);
     cssRoot.setProperty("--zyx-topbar-bg-start", toRgba(topbarColor, 0.22));
     cssRoot.setProperty("--zyx-topbar-bg-end", toRgba(darken(topbarColor, 0.22), 0.9));
     cssRoot.setProperty("--zyx-icon-color", iconColor);
@@ -865,9 +1003,10 @@
     cssRoot.setProperty("--zyx-radius-xl", `${radius}px`);
     cssRoot.setProperty("--zyx-radius-lg", `${Math.max(4, radius - 2)}px`);
     cssRoot.setProperty("--zyx-radius-md", `${Math.max(3, radius - 4)}px`);
+    cssRoot.setProperty("--zyx-hover-shift", `${hoverShift}px`);
     shell.style.transform = `scale(${scale.toFixed(2)})`;
     shell.style.transformOrigin = "top left";
-    shell.style.background = `linear-gradient(150deg, ${accent}22, rgba(0, 0, 0, ${opacity.toFixed(2)}))`;
+    shell.style.background = `linear-gradient(150deg, ${toRgba(shellBgStart, 0.22)}, ${toRgba(shellBgEnd, opacity.toFixed(2))})`;
     cssRoot.setProperty("--zyx-shell-blur", `${blur}px`);
     shell.style.backdropFilter = `blur(var(--zyx-shell-blur)) saturate(115%)`;
   }
@@ -959,6 +1098,10 @@
     state.listeningForMenuBind = false;
   });
 
+  presetButtons.forEach((btn) => {
+    btn.addEventListener("click", () => applyPreset(btn.dataset.preset || "default"));
+  });
+
   settingsBtn.addEventListener("click", () => {
     openSettings();
   });
@@ -996,6 +1139,8 @@
   });
 
   accentInput.addEventListener("input", applyAppearance);
+  shellBgStartInput.addEventListener("input", applyAppearance);
+  shellBgEndInput.addEventListener("input", applyAppearance);
   topbarColorInput.addEventListener("input", applyAppearance);
   iconColorInput.addEventListener("input", applyAppearance);
   outlineColorInput.addEventListener("input", applyAppearance);
@@ -1006,6 +1151,9 @@
   textInput.addEventListener("input", applyAppearance);
   opacityInput.addEventListener("input", applyAppearance);
   sliderColorInput.addEventListener("input", applyAppearance);
+  mutedTextInput.addEventListener("input", applyAppearance);
+  accentSoftInput.addEventListener("input", applyAppearance);
+  searchTextInput.addEventListener("input", applyAppearance);
   headerStartInput.addEventListener("input", applyAppearance);
   headerEndInput.addEventListener("input", applyAppearance);
   headerTextInput.addEventListener("input", applyAppearance);
@@ -1020,9 +1168,15 @@
   scaleInput.addEventListener("input", applyAppearance);
   radiusInput.addEventListener("input", applyAppearance);
   blurInput.addEventListener("input", applyAppearance);
+  hoverShiftInput.addEventListener("input", applyAppearance);
+  searchAutofocusInput.addEventListener("change", () => {
+    state.searchAutofocus = searchAutofocusInput.checked;
+  });
 
   settingsResetBtn.addEventListener("click", () => {
     accentInput.value = "#ff3d3d";
+    shellBgStartInput.value = "#ff3d3d";
+    shellBgEndInput.value = "#000000";
     topbarColorInput.value = "#ff4a4a";
     iconColorInput.value = "#ffdada";
     outlineColorInput.value = "#ff5b5b";
@@ -1033,6 +1187,9 @@
     textInput.value = "#d6d6df";
     opacityInput.value = "45";
     sliderColorInput.value = "#ff6b6b";
+    mutedTextInput.value = "#9b9bab";
+    accentSoftInput.value = "#ffbdbd";
+    searchTextInput.value = "#ffe6e6";
     headerStartInput.value = "#ff4a4a";
     headerEndInput.value = "#3c1212";
     headerTextInput.value = "#ffffff";
@@ -1044,12 +1201,18 @@
     settingsSubtextInput.value = "#c2c2ce";
     settingsCardBorderInput.value = "#ffffff";
     settingsCardBgInput.value = "#ffffff";
+    searchAutofocusInput.checked = true;
+    state.searchAutofocus = true;
     scaleInput.value = "100";
     radiusInput.value = "14";
     blurInput.value = "10";
+    hoverShiftInput.value = "2";
     const cssRoot = document.documentElement.style;
     cssRoot.removeProperty("--zyx-border");
     cssRoot.removeProperty("--zyx-text");
+    cssRoot.removeProperty("--zyx-muted");
+    cssRoot.removeProperty("--zyx-accent-soft");
+    cssRoot.removeProperty("--zyx-search-text");
     cssRoot.removeProperty("--zyx-topbar-bg-start");
     cssRoot.removeProperty("--zyx-topbar-bg-end");
     cssRoot.removeProperty("--zyx-icon-color");
@@ -1072,10 +1235,26 @@
     cssRoot.removeProperty("--zyx-radius-xl");
     cssRoot.removeProperty("--zyx-radius-lg");
     cssRoot.removeProperty("--zyx-radius-md");
+    cssRoot.removeProperty("--zyx-hover-shift");
     cssRoot.removeProperty("--zyx-shell-blur");
     shell.style.background = "";
     shell.style.transform = "";
     shell.style.backdropFilter = "";
+  });
+
+  settingsSaveBtn.addEventListener("click", () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(collectSettings()));
+      settingsSaveBtn.textContent = "Saved";
+      setTimeout(() => {
+        settingsSaveBtn.textContent = "Save";
+      }, 850);
+    } catch (_) {
+      settingsSaveBtn.textContent = "Save failed";
+      setTimeout(() => {
+        settingsSaveBtn.textContent = "Save";
+      }, 1200);
+    }
   });
 
   settingsCloseBtn.addEventListener("click", () => {
@@ -1110,11 +1289,62 @@
   document.body.appendChild(root);
   document.body.appendChild(configBackdrop);
 
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved && typeof saved === "object") {
+        if (saved.toggleKey) CONFIG.toggleKey = saved.toggleKey;
+        if (typeof saved.searchAutofocus === "boolean") {
+          state.searchAutofocus = saved.searchAutofocus;
+          searchAutofocusInput.checked = saved.searchAutofocus;
+        }
+        const assign = (input, key) => {
+          if (saved[key] !== undefined && input) input.value = String(saved[key]);
+        };
+        assign(accentInput, "accent");
+        assign(shellBgStartInput, "shellBgStart");
+        assign(shellBgEndInput, "shellBgEnd");
+        assign(topbarColorInput, "topbarColor");
+        assign(iconColorInput, "iconColor");
+        assign(outlineColorInput, "outlineColor");
+        assign(panelCountTextInput, "panelCountText");
+        assign(panelCountBorderInput, "panelCountBorder");
+        assign(panelCountBgInput, "panelCountBg");
+        assign(borderInput, "border");
+        assign(textInput, "text");
+        assign(opacityInput, "opacity");
+        assign(sliderColorInput, "sliderColor");
+        assign(mutedTextInput, "mutedText");
+        assign(accentSoftInput, "accentSoft");
+        assign(searchTextInput, "searchText");
+        assign(headerStartInput, "headerStart");
+        assign(headerEndInput, "headerEnd");
+        assign(headerTextInput, "headerText");
+        assign(settingsHeaderStartInput, "settingsHeaderStart");
+        assign(settingsHeaderEndInput, "settingsHeaderEnd");
+        assign(settingsSidebarInput, "settingsSidebar");
+        assign(settingsBodyInput, "settingsBody");
+        assign(settingsTextInput, "settingsText");
+        assign(settingsSubtextInput, "settingsSubtext");
+        assign(settingsCardBorderInput, "settingsCardBorder");
+        assign(settingsCardBgInput, "settingsCardBg");
+        assign(scaleInput, "scale");
+        assign(radiusInput, "radius");
+        assign(blurInput, "blur");
+        assign(hoverShiftInput, "hoverShift");
+        settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
+        footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
+      }
+    }
+  } catch (_) {}
+  applyAppearance();
+
   function setVisible(nextVisible) {
     state.visible = nextVisible;
     root.classList.toggle("zyrox-hidden", !nextVisible);
     if (!nextVisible) closeConfig();
-    if (nextVisible) {
+    if (nextVisible && state.searchAutofocus) {
       requestAnimationFrame(() => {
         searchInput.focus();
         if (searchInput.value === CONFIG.toggleKey) {
