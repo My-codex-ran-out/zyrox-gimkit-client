@@ -24,17 +24,19 @@
   const MENU_LAYOUT = {
     general: {
       title: "General",
-      modules: [
-        "Auto Answer",
-        "Answer Streak",
-        "ESP",
-        "Question Preview",
-        "Skip Animation",
-        "Instant Continue",
-        "HUD",
-        "Notifications",
-        "Session Timer",
-        "Hotkeys",
+      groups: [
+        {
+          name: "Core",
+          modules: ["Auto Answer", "Answer Streak", "Question Preview", "Skip Animation", "Instant Continue"],
+        },
+        {
+          name: "Visual",
+          modules: ["ESP", "HUD", "Overlay"],
+        },
+        {
+          name: "Quality of Life",
+          modules: ["Notifications", "Session Timer", "Hotkeys", "Clipboard Tools"],
+        },
       ],
     },
     gamemodeSpecific: {
@@ -67,6 +69,8 @@
   const state = {
     visible: true,
     searchQuery: "",
+    shellWidth: 1160,
+    shellHeight: 640,
     enabledModules: new Set(),
     moduleItems: new Map(),
     modulePanels: new Map(),
@@ -105,15 +109,19 @@
     .zyrox-hidden { display: none !important; }
 
     .zyrox-shell {
+      position: relative;
       display: inline-flex;
       flex-direction: column;
       gap: 10px;
       padding: 10px;
+      width: 1160px;
+      height: 640px;
       border-radius: var(--zyx-radius-xl);
       border: 1px solid var(--zyx-border-soft);
       background: linear-gradient(150deg, rgba(255, 54, 54, 0.08), rgba(0, 0, 0, 0.45));
       backdrop-filter: blur(10px) saturate(115%);
       box-shadow: var(--zyx-shadow);
+      overflow: auto;
     }
 
     .zyrox-topbar {
@@ -189,7 +197,7 @@
       gap: 8px;
       align-items: flex-start;
       overflow-x: auto;
-      max-width: min(96vw, 1530px);
+      max-width: 100%;
       padding-bottom: 2px;
     }
 
@@ -310,6 +318,19 @@
     }
 
     .zyrox-btn:hover { background: rgba(255, 61, 61, 0.2); color: #fff; }
+
+    .zyrox-resize-handle {
+      position: absolute;
+      right: 2px;
+      bottom: 2px;
+      width: 14px;
+      height: 14px;
+      cursor: nwse-resize;
+      border-right: 2px solid rgba(255, 110, 110, 0.85);
+      border-bottom: 2px solid rgba(255, 110, 110, 0.85);
+      border-radius: 0 0 8px 0;
+      opacity: 0.9;
+    }
   `;
 
   const root = document.createElement("div");
@@ -347,6 +368,9 @@
   const footer = document.createElement("div");
   footer.className = "zyrox-footer";
   footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
+
+  const resizeHandle = document.createElement("div");
+  resizeHandle.className = "zyrox-resize-handle";
 
   const configMenu = document.createElement("div");
   configMenu.className = "zyrox-config hidden";
@@ -503,7 +527,9 @@
 
   const generalPanels = document.createElement("div");
   generalPanels.className = "zyrox-panels";
-  generalPanels.appendChild(buildPanel(MENU_LAYOUT.general.title, MENU_LAYOUT.general.modules));
+  for (const generalGroup of MENU_LAYOUT.general.groups) {
+    generalPanels.appendChild(buildPanel(generalGroup.name, generalGroup.modules));
+  }
   generalSection.appendChild(generalPanels);
 
   const gamemodePanels = document.createElement("div");
@@ -517,6 +543,7 @@
   shell.appendChild(generalSection);
   shell.appendChild(gamemodeSection);
   shell.appendChild(footer);
+  shell.appendChild(resizeHandle);
 
   root.appendChild(shell);
 
@@ -573,6 +600,7 @@
   });
 
   let dragState = null;
+  let resizeState = null;
 
   topbar.addEventListener("mousedown", (event) => {
     const rootBox = root.getBoundingClientRect();
@@ -595,5 +623,28 @@
 
   document.addEventListener("mouseup", () => {
     dragState = null;
+    resizeState = null;
+  });
+
+  resizeHandle.addEventListener("mousedown", (event) => {
+    resizeState = {
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: state.shellWidth,
+      startHeight: state.shellHeight,
+    };
+    event.preventDefault();
+    event.stopPropagation();
+  });
+
+  document.addEventListener("mousemove", (event) => {
+    if (!resizeState) return;
+
+    const width = Math.max(760, resizeState.startWidth + (event.clientX - resizeState.startX));
+    const height = Math.max(420, resizeState.startHeight + (event.clientY - resizeState.startY));
+    state.shellWidth = width;
+    state.shellHeight = height;
+    shell.style.width = `${width}px`;
+    shell.style.height = `${height}px`;
   });
 })();
