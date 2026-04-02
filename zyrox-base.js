@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Zyrox Client (UI Base)
+// @name         Zyrox Client
 // @namespace    https://github.com/zyrox
-// @version      0.5.2
+// @version      0.5.3
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -17,12 +17,21 @@
   if (window.__ZYROX_UI_MOUNTED__) return;
   window.__ZYROX_UI_MOUNTED__ = true;
 
+  function readUserscriptVersion() {
+    try {
+      const src = document.currentScript?.textContent || "";
+      const match = src.match(/@version\\s+([^\\n]+)/);
+      if (match) return match[1].trim();
+    } catch {}
+    return "0.5.2";
+  }
+
   const CONFIG = {
     toggleKey: "\\",
     defaultToggleKey: "\\",
     title: "Zyrox",
     subtitle: "Client",
-    version: "0.5.0",
+    version: readUserscriptVersion(),
   };
 
   const MENU_LAYOUT = {
@@ -397,6 +406,20 @@
     .zyrox-setting-card input[type='color'] { width: 100%; height: 34px; border: none; background: transparent; cursor: pointer; }
     .zyrox-setting-card input[type='range'] { width: 100%; }
     .zyrox-settings-actions { display:flex; justify-content:flex-end; gap:8px; padding: 0 14px 14px; }
+    .zyrox-close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 95, 95, 0.4);
+      background: rgba(0, 0, 0, 0.25);
+      color: #ffdada;
+      cursor: pointer;
+      line-height: 1;
+      font-size: 14px;
+    }
 
     .zyrox-resize-handle {
       position: absolute;
@@ -430,16 +453,12 @@
     </div>
     <div class="zyrox-topbar-right">
       <input class="zyrox-search" type="text" placeholder="Search utilities..." autocomplete="off" />
-      <button class="zyrox-keybind-btn" type="button" title="Change menu toggle key">Menu Key: ${CONFIG.toggleKey}</button>
-      <button class="zyrox-btn zyrox-btn-square zyrox-menu-key-reset" type="button" title="Reset menu key">↺</button>
       <button class="zyrox-settings-btn" type="button" title="Open client settings">Settings</button>
       <span class="zyrox-chip">v${CONFIG.version}</span>
     </div>
   `;
 
   const searchInput = topbar.querySelector(".zyrox-search");
-  const menuBindBtn = topbar.querySelector(".zyrox-keybind-btn");
-  const menuKeyResetBtn = topbar.querySelector(".zyrox-menu-key-reset");
   const settingsBtn = topbar.querySelector(".zyrox-settings-btn");
 
   const generalSection = document.createElement("section");
@@ -464,6 +483,7 @@
       <div class="zyrox-config-title">Module Config</div>
       <div class="zyrox-config-sub">Edit settings</div>
     </div>
+    <button class="zyrox-close-btn config-close-btn" type="button" title="Close">✕</button>
     <div class="zyrox-config-body">
       <div class="zyrox-config-row">
         <span>Keybind</span>
@@ -486,7 +506,13 @@
       <div class="zyrox-settings-title">Client Settings</div>
       <div class="zyrox-settings-sub">Customize colors and appearance</div>
     </div>
+    <button class="zyrox-close-btn settings-close-top" type="button" title="Close">✕</button>
     <div class="zyrox-settings-body">
+      <div class="zyrox-setting-card">
+        <label>Menu Toggle Key</label>
+        <button class="zyrox-keybind-btn settings-menu-key" type="button">Menu Key: ${CONFIG.toggleKey}</button>
+        <button class="zyrox-btn zyrox-btn-square settings-menu-key-reset" type="button" title="Reset menu key">↺</button>
+      </div>
       <div class="zyrox-setting-card">
         <label>Accent Color</label>
         <input type="color" class="set-accent" value="#ff3d3d" />
@@ -513,8 +539,12 @@
 
   const configTitleEl = configMenu.querySelector(".zyrox-config-title");
   const configSubEl = configMenu.querySelector(".zyrox-config-sub");
+  const configCloseBtn = configMenu.querySelector(".config-close-btn");
   const resetBindBtn = configMenu.querySelector(".zyrox-btn-square");
   const setBindBtn = configMenu.querySelector(".zyrox-btn:not(.zyrox-btn-square)");
+  const settingsMenuKeyBtn = settingsMenu.querySelector(".settings-menu-key");
+  const settingsMenuKeyResetBtn = settingsMenu.querySelector(".settings-menu-key-reset");
+  const settingsTopCloseBtn = settingsMenu.querySelector(".settings-close-top");
   const accentInput = settingsMenu.querySelector(".set-accent");
   const borderInput = settingsMenu.querySelector(".set-border");
   const textInput = settingsMenu.querySelector(".set-text");
@@ -661,15 +691,15 @@
     setBindBtn.textContent = "Press any key...";
   });
 
-  menuBindBtn.addEventListener("click", () => {
+  settingsMenuKeyBtn.addEventListener("click", () => {
     state.listeningForMenuBind = true;
-    menuBindBtn.textContent = "Press key...";
+    settingsMenuKeyBtn.textContent = "Press key...";
     searchInput.blur();
   });
 
-  menuKeyResetBtn.addEventListener("click", () => {
+  settingsMenuKeyResetBtn.addEventListener("click", () => {
     CONFIG.toggleKey = CONFIG.defaultToggleKey;
-    menuBindBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
+    settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
     footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
     state.listeningForMenuBind = false;
   });
@@ -720,6 +750,8 @@
   settingsCloseBtn.addEventListener("click", () => {
     closeConfig();
   });
+  configCloseBtn.addEventListener("click", () => closeConfig());
+  settingsTopCloseBtn.addEventListener("click", () => closeConfig());
 
   const generalPanels = document.createElement("div");
   generalPanels.className = "zyrox-panels";
@@ -767,7 +799,7 @@
     if (state.listeningForMenuBind) {
       event.preventDefault();
       CONFIG.toggleKey = event.key;
-      menuBindBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
+      settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
       footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
       state.listeningForMenuBind = false;
       return;
@@ -798,11 +830,7 @@
     }
   });
 
-  document.addEventListener("mousedown", (event) => {
-    if (!configBackdrop.classList.contains("hidden") && !configMenu.contains(event.target)) {
-      closeConfig();
-    }
-  });
+  // Intentionally no backdrop click-to-close; menus close only via explicit close buttons.
 
   let dragState = null;
   let resizeState = null;
