@@ -436,10 +436,11 @@
     }
     setup() {
       const manager = this;
+      const shouldTrackSocketUrl = (url) => String(url || "").includes("gimkitconnect.com");
       class NewWebSocket extends WebSocket {
         constructor(url, params) {
           super(url, params);
-          if (!manager.socket) manager.registerSocket(this);
+          if (shouldTrackSocketUrl(url)) manager.registerSocket(this);
         }
         send(data) {
           manager.onSend(data);
@@ -1631,6 +1632,7 @@
     questionIdList: [],
     currentQuestionIndex: -1,
     lastAnsweredId: null,
+    playerId: null,
     lastDebugAt: 0,
   };
   globalThis.__ZYROX_AUTOANSWER_STATE__ = zyroxAutoAnswerState;
@@ -1638,7 +1640,7 @@
   function getSocketManager() {
     if (zyroxAutoAnswerState.socketManager) return zyroxAutoAnswerState.socketManager;
     const direct = globalThis.socketManager;
-    if (direct && typeof direct.sendMessage === "function" && typeof direct.addEventListener === "function") {
+    if (direct && direct.socket && typeof direct.sendMessage === "function" && typeof direct.addEventListener === "function") {
       zyroxAutoAnswerState.socketManager = direct;
       console.log("[Zyrox][AutoAnswer] Found socketManager on window.socketManager");
       return direct;
@@ -1651,7 +1653,7 @@
       } catch (_) {
         continue;
       }
-      if (candidate && typeof candidate.sendMessage === "function" && typeof candidate.addEventListener === "function") {
+      if (candidate && candidate.socket && typeof candidate.sendMessage === "function" && typeof candidate.addEventListener === "function") {
         zyroxAutoAnswerState.socketManager = candidate;
         console.log(`[Zyrox][AutoAnswer] Found socket manager candidate on window.${key}`);
         return candidate;
@@ -1870,10 +1872,16 @@
               zyroxAutoAnswerState.answerDeviceId = id;
             } catch (_) {}
           }
-          if (key.includes("_currentQuestionId")) {
+          if (zyroxAutoAnswerState.playerId && key === `PLAYER_${zyroxAutoAnswerState.playerId}_currentQuestionId`) {
             zyroxAutoAnswerState.currentQuestionId = data[key];
           }
         }
+      }
+    });
+
+    socketManager.addEventListener("colyseusMessage", (event) => {
+      if (event.detail?.type === "AUTH_ID") {
+        zyroxAutoAnswerState.playerId = event.detail?.message ?? null;
       }
     });
 
