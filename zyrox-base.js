@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox Client
 // @namespace    https://github.com/zyrox
-// @version      0.5.4
+// @version      0.5.5
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -19,7 +19,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "0.5.4";
+    const CLIENT_VERSION = "0.5.5";
     return CLIENT_VERSION;
   }
 
@@ -97,6 +97,9 @@
       --zyx-border-soft: rgba(255, 255, 255, 0.12);
       --zyx-text: #d6d6df;
       --zyx-text-strong: #fff;
+      --zyx-header-text: #fff;
+      --zyx-header-bg-start: rgba(255, 61, 61, 0.24);
+      --zyx-header-bg-end: rgba(40, 12, 12, 0.92);
       --zyx-muted: #9b9bab;
       --zyx-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
       --zyx-radius-xl: 14px;
@@ -261,9 +264,9 @@
       padding: 0 10px;
       font-size: 12px;
       font-weight: 600;
-      color: var(--zyx-text-strong);
+      color: var(--zyx-header-text);
       border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      background: linear-gradient(90deg, rgba(255, 61, 61, 0.24), rgba(40, 12, 12, 0.92));
+      background: linear-gradient(90deg, var(--zyx-header-bg-start), var(--zyx-header-bg-end));
     }
 
     .zyrox-panel-count {
@@ -402,15 +405,32 @@
     .zyrox-settings-header { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.09); background: linear-gradient(90deg, rgba(255, 61, 61, .23), rgba(45, 12, 12, .95)); }
     .zyrox-settings-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
     .zyrox-settings-sub { font-size: 12px; color: #c2c2ce; }
-    .zyrox-settings-body { padding: 14px; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px; }
-    .zyrox-setting-category {
-      grid-column: 1 / -1;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: .3px;
-      color: #ffb9b9;
-      margin-top: 2px;
+    .zyrox-settings-layout { display: grid; grid-template-columns: 150px 1fr; min-height: 350px; }
+    .zyrox-settings-sidebar {
+      border-right: 1px solid rgba(255,255,255,.08);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: rgba(255,255,255,.02);
     }
+    .zyrox-settings-tab {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      padding: 7px 8px;
+      font-size: 12px;
+      color: #ffdede;
+      background: rgba(0,0,0,.2);
+      text-align: left;
+      cursor: pointer;
+    }
+    .zyrox-settings-tab.active {
+      border-color: rgba(255, 105, 105, 0.6);
+      background: rgba(255, 61, 61, 0.17);
+      color: #fff;
+    }
+    .zyrox-settings-body { padding: 14px; display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 12px; }
+    .zyrox-settings-pane.hidden { display: none !important; }
     .zyrox-setting-card { border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 10px; background: rgba(255,255,255,.03); }
     .zyrox-setting-card label { display:block; font-size: 12px; margin-bottom: 8px; color: #ffe5e5; }
     .zyrox-setting-card input[type='color'] { width: 100%; height: 34px; border: none; background: transparent; cursor: pointer; }
@@ -517,42 +537,68 @@
       <div class="zyrox-settings-sub">Customize colors and appearance</div>
     </div>
     <button class="zyrox-close-btn settings-close-top" type="button" title="Close">✕</button>
-    <div class="zyrox-settings-body">
-      <div class="zyrox-setting-category">Controls</div>
-      <div class="zyrox-setting-card">
-        <label>Menu Toggle Key</label>
-        <button class="zyrox-keybind-btn settings-menu-key" type="button">Menu Key: ${CONFIG.toggleKey}</button>
-        <button class="zyrox-btn zyrox-btn-square settings-menu-key-reset" type="button" title="Reset menu key">↺</button>
+    <div class="zyrox-settings-layout">
+      <div class="zyrox-settings-sidebar">
+        <button class="zyrox-settings-tab active" type="button" data-tab="controls">Controls</button>
+        <button class="zyrox-settings-tab" type="button" data-tab="theme">Theme</button>
+        <button class="zyrox-settings-tab" type="button" data-tab="appearance">Appearance</button>
       </div>
-      <div class="zyrox-setting-card">
-        <label>UI Scale</label>
-        <input type="range" class="set-scale" min="80" max="130" value="100" />
+      <div class="zyrox-settings-pane" data-pane="controls">
+        <div class="zyrox-settings-body">
+          <div class="zyrox-setting-card">
+            <label>Menu Toggle Key</label>
+            <button class="zyrox-keybind-btn settings-menu-key" type="button">Menu Key: ${CONFIG.toggleKey}</button>
+            <button class="zyrox-btn zyrox-btn-square settings-menu-key-reset" type="button" title="Reset menu key">↺</button>
+          </div>
+        </div>
       </div>
-      <div class="zyrox-setting-category">Theme</div>
-      <div class="zyrox-setting-card">
-        <label>Accent Color</label>
-        <input type="color" class="set-accent" value="#ff3d3d" />
+      <div class="zyrox-settings-pane hidden" data-pane="theme">
+        <div class="zyrox-settings-body">
+          <div class="zyrox-setting-card">
+            <label>Accent Color</label>
+            <input type="color" class="set-accent" value="#ff3d3d" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Panel Border</label>
+            <input type="color" class="set-border" value="#ff6f6f" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Text Color</label>
+            <input type="color" class="set-text" value="#d6d6df" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Background Opacity</label>
+            <input type="range" class="set-opacity" min="20" max="100" value="45" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Module Bar Start Color</label>
+            <input type="color" class="set-header-start" value="#ff4a4a" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Module Bar End Color</label>
+            <input type="color" class="set-header-end" value="#3c1212" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Module Bar Text</label>
+            <input type="color" class="set-header-text" value="#ffffff" />
+          </div>
+        </div>
       </div>
-      <div class="zyrox-setting-card">
-        <label>Panel Border</label>
-        <input type="color" class="set-border" value="#ff6f6f" />
-      </div>
-      <div class="zyrox-setting-card">
-        <label>Text Color</label>
-        <input type="color" class="set-text" value="#d6d6df" />
-      </div>
-      <div class="zyrox-setting-card">
-        <label>Background Opacity</label>
-        <input type="range" class="set-opacity" min="20" max="100" value="45" />
-      </div>
-      <div class="zyrox-setting-category">Appearance</div>
-      <div class="zyrox-setting-card">
-        <label>Corner Radius</label>
-        <input type="range" class="set-radius" min="6" max="20" value="14" />
-      </div>
-      <div class="zyrox-setting-card">
-        <label>Panel Blur</label>
-        <input type="range" class="set-blur" min="0" max="16" value="10" />
+      <div class="zyrox-settings-pane hidden" data-pane="appearance">
+        <div class="zyrox-settings-body">
+          <div class="zyrox-setting-card">
+            <label>UI Scale</label>
+            <input type="range" class="set-scale" min="80" max="130" value="100" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Corner Radius</label>
+            <input type="range" class="set-radius" min="6" max="20" value="14" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Panel Blur</label>
+            <input type="range" class="set-blur" min="0" max="16" value="10" />
+          </div>
+        </div>
       </div>
     </div>
     <div class="zyrox-settings-actions">
@@ -565,6 +611,8 @@
   const configTitleEl = configMenu.querySelector(".zyrox-config-title");
   const configSubEl = configMenu.querySelector(".zyrox-config-sub");
   const configCloseBtn = configMenu.querySelector(".config-close-btn");
+  const settingsTabs = [...settingsMenu.querySelectorAll(".zyrox-settings-tab")];
+  const settingsPanes = [...settingsMenu.querySelectorAll(".zyrox-settings-pane")];
   const resetBindBtn = configMenu.querySelector(".zyrox-btn-square");
   const setBindBtn = configMenu.querySelector(".zyrox-btn:not(.zyrox-btn-square)");
   const settingsMenuKeyBtn = settingsMenu.querySelector(".settings-menu-key");
@@ -574,6 +622,9 @@
   const borderInput = settingsMenu.querySelector(".set-border");
   const textInput = settingsMenu.querySelector(".set-text");
   const opacityInput = settingsMenu.querySelector(".set-opacity");
+  const headerStartInput = settingsMenu.querySelector(".set-header-start");
+  const headerEndInput = settingsMenu.querySelector(".set-header-end");
+  const headerTextInput = settingsMenu.querySelector(".set-header-text");
   const scaleInput = settingsMenu.querySelector(".set-scale");
   const radiusInput = settingsMenu.querySelector(".set-radius");
   const blurInput = settingsMenu.querySelector(".set-blur");
@@ -640,11 +691,17 @@
     const border = borderInput.value;
     const text = textInput.value;
     const opacity = Number(opacityInput.value) / 100;
+    const headerStart = headerStartInput.value;
+    const headerEnd = headerEndInput.value;
+    const headerText = headerTextInput.value;
     const scale = Number(scaleInput.value) / 100;
     const radius = Number(radiusInput.value);
     const blur = Number(blurInput.value);
     shell.style.setProperty("--zyx-border", `${border}99`);
     shell.style.setProperty("--zyx-text", text);
+    shell.style.setProperty("--zyx-header-bg-start", `${headerStart}3d`);
+    shell.style.setProperty("--zyx-header-bg-end", `${headerEnd}eb`);
+    shell.style.setProperty("--zyx-header-text", headerText);
     shell.style.setProperty("--zyx-radius-xl", `${radius}px`);
     shell.style.transform = `scale(${scale.toFixed(2)})`;
     shell.style.transformOrigin = "top left";
@@ -743,6 +800,14 @@
     openSettings();
   });
 
+  settingsTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab.dataset.tab;
+      for (const t of settingsTabs) t.classList.toggle("active", t === tab);
+      for (const pane of settingsPanes) pane.classList.toggle("hidden", pane.dataset.pane !== target);
+    });
+  });
+
   resetBindBtn.addEventListener("click", () => {
     if (!openConfigModule) return;
     const cfg = moduleCfg(openConfigModule);
@@ -771,6 +836,9 @@
   borderInput.addEventListener("input", applyAppearance);
   textInput.addEventListener("input", applyAppearance);
   opacityInput.addEventListener("input", applyAppearance);
+  headerStartInput.addEventListener("input", applyAppearance);
+  headerEndInput.addEventListener("input", applyAppearance);
+  headerTextInput.addEventListener("input", applyAppearance);
   scaleInput.addEventListener("input", applyAppearance);
   radiusInput.addEventListener("input", applyAppearance);
   blurInput.addEventListener("input", applyAppearance);
@@ -780,11 +848,17 @@
     borderInput.value = "#ff6f6f";
     textInput.value = "#d6d6df";
     opacityInput.value = "45";
+    headerStartInput.value = "#ff4a4a";
+    headerEndInput.value = "#3c1212";
+    headerTextInput.value = "#ffffff";
     scaleInput.value = "100";
     radiusInput.value = "14";
     blurInput.value = "10";
     shell.style.removeProperty("--zyx-border");
     shell.style.removeProperty("--zyx-text");
+    shell.style.removeProperty("--zyx-header-bg-start");
+    shell.style.removeProperty("--zyx-header-bg-end");
+    shell.style.removeProperty("--zyx-header-text");
     shell.style.removeProperty("--zyx-radius-xl");
     shell.style.background = "";
     shell.style.transform = "";
