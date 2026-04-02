@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox Client
 // @namespace    https://github.com/zyrox
-// @version      0.5.2
+// @version      0.5.3
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
