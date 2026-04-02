@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      0.7.2
+// @version      0.7.3
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -20,7 +20,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "0.7.2";
+    const CLIENT_VERSION = "0.7.3";
     return CLIENT_VERSION;
   }
 
@@ -88,6 +88,7 @@
     modulePanels: new Map(),
     moduleEntries: [],
     moduleConfig: new Map(),
+    collapsedPanels: {},
     listeningForBind: null,
     listeningForMenuBind: false,
     searchAutofocus: true,
@@ -197,6 +198,30 @@
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+
+    .zyrox-collapse-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      max-width: 520px;
+    }
+
+    .zyrox-collapse-btn {
+      border: 1px solid var(--zyx-outline-color);
+      background: rgba(0, 0, 0, 0.32);
+      color: var(--zyx-settings-text);
+      border-radius: 7px;
+      padding: 3px 7px;
+      font-size: 10px;
+      cursor: pointer;
+      line-height: 1.1;
+    }
+
+    .zyrox-collapse-btn.inactive {
+      opacity: 0.55;
+      border-color: var(--zyx-border-soft);
     }
 
 
@@ -620,6 +645,7 @@
         <div class="subtitle">${CONFIG.subtitle}</div>
       </div>
     </div>
+    <div class="zyrox-collapse-row"></div>
     <div class="zyrox-topbar-right">
       <input class="zyrox-search" type="text" placeholder="Search utilities..." autocomplete="off" />
       <button class="zyrox-settings-btn" type="button" title="Open client settings">⚙</button>
@@ -629,6 +655,7 @@
 
   const searchInput = topbar.querySelector(".zyrox-search");
   const settingsBtn = topbar.querySelector(".zyrox-settings-btn");
+  const collapseRow = topbar.querySelector(".zyrox-collapse-row");
 
   const generalSection = document.createElement("section");
   generalSection.className = "zyrox-section";
@@ -1028,7 +1055,25 @@
       looseInitialized: state.looseInitialized,
       loosePositions: state.loosePositions,
       loosePanelPositions: state.loosePanelPositions,
+      collapsedPanels: state.collapsedPanels,
     };
+  }
+
+  function setPanelCollapsed(panelName, collapsed) {
+    const panel = panelByName.get(panelName);
+    if (!panel) return;
+    const list = panel.querySelector(".zyrox-module-list");
+    if (!list) return;
+    state.collapsedPanels[panelName] = collapsed;
+    list.style.display = collapsed ? "none" : "";
+  }
+
+  function syncCollapseButtons() {
+    const buttons = [...collapseRow.querySelectorAll(".zyrox-collapse-btn")];
+    for (const button of buttons) {
+      const name = button.textContent;
+      button.classList.toggle("inactive", !!state.collapsedPanels[name]);
+    }
   }
 
   function clampToViewport(x, y, el) {
@@ -1464,6 +1509,11 @@
     state.looseInitialized = false;
     state.loosePositions = { topbar: { x: 12, y: 12 } };
     state.loosePanelPositions = {};
+    state.collapsedPanels = {};
+    for (const panelName of panelByName.keys()) {
+      setPanelCollapsed(panelName, false);
+    }
+    syncCollapseButtons();
     setDisplayMode("merged");
     const cssRoot = document.documentElement.style;
     cssRoot.removeProperty("--zyx-border");
@@ -1543,6 +1593,19 @@
   }
   gamemodeSection.appendChild(gamemodePanels);
 
+  for (const [panelName] of panelByName.entries()) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "zyrox-collapse-btn";
+    btn.textContent = panelName;
+    btn.addEventListener("click", () => {
+      const nextCollapsed = !state.collapsedPanels[panelName];
+      setPanelCollapsed(panelName, nextCollapsed);
+      btn.classList.toggle("inactive", nextCollapsed);
+    });
+    collapseRow.appendChild(btn);
+  }
+
   shell.appendChild(topbar);
   shell.appendChild(generalSection);
   shell.appendChild(gamemodeSection);
@@ -1610,11 +1673,18 @@
         if (saved.loosePanelPositions && typeof saved.loosePanelPositions === "object") {
           state.loosePanelPositions = saved.loosePanelPositions;
         }
+        if (saved.collapsedPanels && typeof saved.collapsedPanels === "object") {
+          state.collapsedPanels = saved.collapsedPanels;
+        }
         settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
         footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
       }
     }
   } catch (_) {}
+  for (const panelName of panelByName.keys()) {
+    setPanelCollapsed(panelName, !!state.collapsedPanels[panelName]);
+  }
+  syncCollapseButtons();
   applyAppearance();
   setDisplayMode(state.displayMode);
 
@@ -1635,6 +1705,14 @@
   }
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (!configBackdrop.classList.contains("hidden")) {
+        event.preventDefault();
+        closeConfig();
+        return;
+      }
+    }
+
     if (state.listeningForMenuBind) {
       event.preventDefault();
       CONFIG.toggleKey = event.key;
