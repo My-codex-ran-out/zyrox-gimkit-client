@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.0.5
+// @version      1.0.6
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.0.5";
+    const CLIENT_VERSION = "1.0.6";
     return CLIENT_VERSION;
   }
 
@@ -1081,6 +1081,7 @@
       nameSize: 20,
       nameColor: "#000000",
       offscreenStyle: "tracers",
+      offscreenTheme: "classic",
       tracerWidth: 3,
       tracerColor: "#ff3b3b",
       arrowSize: 14,
@@ -1108,6 +1109,7 @@
     const showHitbox = espCfg.hitbox !== false;
     const showNames = espCfg.names !== false;
     const offscreenStyle = espCfg.offscreenStyle === "arrows" ? "arrows" : "tracers";
+    const offscreenTheme = espCfg.offscreenTheme || "classic";
     const camX = Number(camera?.midPoint?.x);
     const camY = Number(camera?.midPoint?.y);
     const zoom = Number(camera?.zoom ?? 1) || 1;
@@ -1152,17 +1154,25 @@
         const endY = canvas.height / 2 + dy * scale;
 
         if (offscreenStyle === "tracers") {
+          ctx.save();
           ctx.beginPath();
           ctx.moveTo(canvas.width / 2, canvas.height / 2);
           ctx.lineTo(endX, endY);
           ctx.lineWidth = tracerWidth;
           ctx.strokeStyle = tracerColor;
+          if (offscreenTheme === "dashed") ctx.setLineDash([8, 6]);
+          if (offscreenTheme === "neon") {
+            ctx.shadowColor = tracerColor;
+            ctx.shadowBlur = 10;
+          }
           ctx.stroke();
+          ctx.restore();
         } else {
           const headLength = arrowSize;
           const headAngle = Math.PI / 6;
           const a1 = angle - headAngle;
           const a2 = angle + headAngle;
+          ctx.save();
           ctx.beginPath();
           ctx.moveTo(endX, endY);
           ctx.lineTo(endX - Math.cos(a1) * headLength, endY - Math.sin(a1) * headLength);
@@ -1170,7 +1180,13 @@
           ctx.lineTo(endX - Math.cos(a2) * headLength, endY - Math.sin(a2) * headLength);
           ctx.lineWidth = tracerWidth;
           ctx.strokeStyle = arrowColor;
+          if (offscreenTheme === "dashed") ctx.setLineDash([6, 5]);
+          if (offscreenTheme === "neon") {
+            ctx.shadowColor = arrowColor;
+            ctx.shadowBlur = 10;
+          }
           ctx.stroke();
+          ctx.restore();
         }
       }
 
@@ -1280,6 +1296,17 @@
                   options: [
                     { value: "tracers", label: "Tracers" },
                     { value: "arrows", label: "Arrows" },
+                  ],
+                },
+                {
+                  id: "offscreenTheme",
+                  label: "Off-screen Theme",
+                  type: "select",
+                  default: "classic",
+                  options: [
+                    { value: "classic", label: "Classic" },
+                    { value: "dashed", label: "Dashed" },
+                    { value: "neon", label: "Neon" },
                   ],
                 },
                 { id: "tracerWidth", label: "Tracer Width", type: "slider", min: 1, max: 8, step: 1, default: 3, unit: "px" },
@@ -2402,12 +2429,21 @@
               <option value="arrows" ${cfg.offscreenStyle === "arrows" ? "selected" : ""}>Arrows</option>
             </select>
           </label>
+          <label>Theme
+            <select class="esp-offscreen-theme">
+              <option value="classic" ${cfg.offscreenTheme === "classic" ? "selected" : ""}>Classic</option>
+              <option value="dashed" ${cfg.offscreenTheme === "dashed" ? "selected" : ""}>Dashed</option>
+              <option value="neon" ${cfg.offscreenTheme === "neon" ? "selected" : ""}>Neon</option>
+            </select>
+          </label>
           <label>Tracer Width <input type="range" class="esp-tracer-width" min="1" max="8" step="1" value="${cfg.tracerWidth}" /></label>
           <span class="esp-tracer-width-value">${cfg.tracerWidth}px</span>
           <input type="color" class="esp-tracer-color" value="${cfg.tracerColor}" />
           <label>Arrow Size <input type="range" class="esp-arrow-size" min="8" max="30" step="1" value="${cfg.arrowSize}" /></label>
           <span class="esp-arrow-size-value">${cfg.arrowSize}px</span>
           <input type="color" class="esp-arrow-color" value="${cfg.arrowColor}" />
+          <button type="button" class="zyrox-btn esp-indicator-preset" data-preset="classic">Classic Preset</button>
+          <button type="button" class="zyrox-btn esp-indicator-preset" data-preset="neon">Neon Preset</button>
         </div>
       `);
 
@@ -2459,10 +2495,50 @@
           syncEsp();
         });
       }
+      const themeInput = offscreenRow.querySelector(".esp-offscreen-theme");
+      if (themeInput) {
+        themeInput.addEventListener("change", (event) => {
+          cfg.offscreenTheme = String(event.target.value || "classic");
+          syncEsp();
+        });
+      }
       bindSlider(offscreenRow, ".esp-tracer-width", "tracerWidth", ".esp-tracer-width-value");
       bindColor(offscreenRow, ".esp-tracer-color", "tracerColor");
       bindSlider(offscreenRow, ".esp-arrow-size", "arrowSize", ".esp-arrow-size-value");
       bindColor(offscreenRow, ".esp-arrow-color", "arrowColor");
+
+      for (const presetButton of offscreenRow.querySelectorAll(".esp-indicator-preset")) {
+        presetButton.addEventListener("click", () => {
+          const preset = presetButton.dataset.preset;
+          if (preset === "neon") {
+            cfg.offscreenTheme = "neon";
+            cfg.tracerColor = "#ff2df8";
+            cfg.arrowColor = "#42f5ff";
+            cfg.tracerWidth = 4;
+            cfg.arrowSize = 16;
+          } else {
+            cfg.offscreenTheme = "classic";
+            cfg.tracerColor = "#ff3b3b";
+            cfg.arrowColor = "#ff3b3b";
+            cfg.tracerWidth = 3;
+            cfg.arrowSize = 14;
+          }
+          const tracerWidthInput = offscreenRow.querySelector(".esp-tracer-width");
+          const arrowSizeInput = offscreenRow.querySelector(".esp-arrow-size");
+          const tracerColorInput = offscreenRow.querySelector(".esp-tracer-color");
+          const arrowColorInput = offscreenRow.querySelector(".esp-arrow-color");
+          const tracerWidthLabel = offscreenRow.querySelector(".esp-tracer-width-value");
+          const arrowSizeLabel = offscreenRow.querySelector(".esp-arrow-size-value");
+          if (themeInput) themeInput.value = cfg.offscreenTheme;
+          if (tracerWidthInput) tracerWidthInput.value = String(cfg.tracerWidth);
+          if (arrowSizeInput) arrowSizeInput.value = String(cfg.arrowSize);
+          if (tracerColorInput) tracerColorInput.value = cfg.tracerColor;
+          if (arrowColorInput) arrowColorInput.value = cfg.arrowColor;
+          if (tracerWidthLabel) tracerWidthLabel.textContent = `${cfg.tracerWidth}px`;
+          if (arrowSizeLabel) arrowSizeLabel.textContent = `${cfg.arrowSize}px`;
+          syncEsp();
+        });
+      }
     } else if (moduleLayout && Array.isArray(moduleLayout.settings)) {
       for (const setting of moduleLayout.settings) {
         const settingCard = document.createElement("div");
