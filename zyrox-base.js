@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.0.8
+// @version      1.0.9
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.0.8";
+    const CLIENT_VERSION = "1.0.9";
     return CLIENT_VERSION;
   }
 
@@ -1076,6 +1076,7 @@
     const defaults = {
       hitbox: true,
       hitboxSize: 80,
+      hitboxWidth: 3,
       hitboxColor: "#ff3b3b",
       names: true,
       nameSize: 20,
@@ -1088,6 +1089,7 @@
       arrowSize: 14,
       arrowColor: "#ff3b3b",
       arrowStyle: "regular",
+      valueTextColor: "#ffffff",
     };
     const liveCfg = window.__zyroxEspConfig;
     if (liveCfg && typeof liveCfg === "object") return { ...defaults, ...liveCfg };
@@ -1136,6 +1138,7 @@
       const arrowColor = espCfg.arrowColor || (isTeammate ? "green" : "red");
       const nameColor = espCfg.nameColor || "#000000";
       const hitboxSize = Math.max(12, Number(espCfg.hitboxSize) || 80);
+      const hitboxWidth = Math.max(1, Number(espCfg.hitboxWidth) || 3);
       const nameSize = Math.max(8, Number(espCfg.nameSize) || 20);
       const tracerWidth = Math.max(1, Number(espCfg.tracerWidth) || 3);
       const arrowSize = Math.max(6, Number(espCfg.arrowSize) || 14);
@@ -1143,7 +1146,7 @@
       if (onScreen && showHitbox) {
         const boxSize = Math.max(24, hitboxSize / zoom);
         ctx.beginPath();
-        ctx.lineWidth = tracerWidth;
+        ctx.lineWidth = hitboxWidth;
         ctx.strokeStyle = hitboxColor;
         ctx.strokeRect(screenX - boxSize / 2, screenY - boxSize / 2, boxSize, boxSize);
       }
@@ -1310,6 +1313,7 @@
               settings: [
                 { id: "hitbox", label: "Hitbox", type: "checkbox", default: true },
                 { id: "hitboxSize", label: "Hitbox Size", type: "slider", min: 24, max: 180, step: 2, default: 80, unit: "px" },
+                { id: "hitboxWidth", label: "Hitbox Width", type: "slider", min: 1, max: 10, step: 1, default: 3, unit: "px" },
                 { id: "hitboxColor", label: "Hitbox Color", type: "color", default: "#ff3b3b" },
                 { id: "names", label: "Names", type: "checkbox", default: true },
                 { id: "nameSize", label: "Name Size", type: "slider", min: 10, max: 32, step: 1, default: 20, unit: "px" },
@@ -1341,6 +1345,7 @@
                 { id: "tracerColor", label: "Tracer Color", type: "color", default: "#ff3b3b" },
                 { id: "arrowSize", label: "Arrow Size", type: "slider", min: 8, max: 30, step: 1, default: 14, unit: "px" },
                 { id: "arrowColor", label: "Arrow Color", type: "color", default: "#ff3b3b" },
+                { id: "valueTextColor", label: "Value Text Color", type: "color", default: "#ffffff" },
                 {
                   id: "arrowStyle",
                   label: "Arrow Style",
@@ -2470,7 +2475,9 @@
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="esp-hitbox-enabled" ${cfg.hitbox ? "checked" : ""} /> Enabled</label>
           <label>Size <input type="range" class="esp-hitbox-size" min="24" max="180" step="2" value="${cfg.hitboxSize}" /></label>
-          <span class="esp-hitbox-size-value">${cfg.hitboxSize}px</span>
+          <span class="esp-hitbox-size-value esp-value-text">${cfg.hitboxSize}px</span>
+          <label>Width <input type="range" class="esp-hitbox-width" min="1" max="10" step="1" value="${cfg.hitboxWidth}" /></label>
+          <span class="esp-hitbox-width-value esp-value-text">${cfg.hitboxWidth}px</span>
           <input type="color" class="esp-hitbox-color" value="${cfg.hitboxColor}" />
         </div>
       `);
@@ -2479,7 +2486,7 @@
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="esp-names-enabled" ${cfg.names ? "checked" : ""} /> Enabled</label>
           <label>Size <input type="range" class="esp-name-size" min="10" max="32" step="1" value="${cfg.nameSize}" /></label>
-          <span class="esp-name-size-value">${cfg.nameSize}px</span>
+          <span class="esp-name-size-value esp-value-text">${cfg.nameSize}px</span>
           <input type="color" class="esp-name-color" value="${cfg.nameColor}" />
         </div>
       `);
@@ -2506,12 +2513,12 @@
           </label>
           <span class="esp-tracer-controls" style="display:flex;align-items:center;gap:10px;">
             <label>Tracer Width <input type="range" class="esp-tracer-width" min="1" max="8" step="1" value="${cfg.tracerWidth}" /></label>
-            <span class="esp-tracer-width-value">${cfg.tracerWidth}px</span>
+            <span class="esp-tracer-width-value esp-value-text">${cfg.tracerWidth}px</span>
             <input type="color" class="esp-tracer-color" value="${cfg.tracerColor}" />
           </span>
           <span class="esp-arrow-controls" style="display:flex;align-items:center;gap:10px;">
             <label>Arrow Size <input type="range" class="esp-arrow-size" min="8" max="30" step="1" value="${cfg.arrowSize}" /></label>
-            <span class="esp-arrow-size-value">${cfg.arrowSize}px</span>
+            <span class="esp-arrow-size-value esp-value-text">${cfg.arrowSize}px</span>
             <input type="color" class="esp-arrow-color" value="${cfg.arrowColor}" />
             <label>Arrow Style
               <select class="esp-arrow-style">
@@ -2521,6 +2528,9 @@
               </select>
             </label>
           </span>
+          <label>Value Text
+            <input type="color" class="esp-value-text-color" value="${cfg.valueTextColor}" />
+          </label>
         </div>
       `);
 
@@ -2528,6 +2538,12 @@
         window.__zyroxEspConfig = { ...cfg };
       };
       syncEsp();
+      const applyValueTextColor = () => {
+        for (const el of configBody.querySelectorAll(".esp-value-text")) {
+          el.style.color = cfg.valueTextColor || "#ffffff";
+        }
+      };
+      applyValueTextColor();
 
       const bindCheckbox = (root, selector, key) => {
         const input = root.querySelector(selector);
@@ -2559,6 +2575,7 @@
 
       bindCheckbox(hitboxRow, ".esp-hitbox-enabled", "hitbox");
       bindSlider(hitboxRow, ".esp-hitbox-size", "hitboxSize", ".esp-hitbox-size-value");
+      bindSlider(hitboxRow, ".esp-hitbox-width", "hitboxWidth", ".esp-hitbox-width-value");
       bindColor(hitboxRow, ".esp-hitbox-color", "hitboxColor");
 
       bindCheckbox(namesRow, ".esp-names-enabled", "names");
@@ -2602,6 +2619,14 @@
       if (arrowStyleInput) {
         arrowStyleInput.addEventListener("change", (event) => {
           cfg.arrowStyle = String(event.target.value || "regular");
+          syncEsp();
+        });
+      }
+      const valueTextColorInput = offscreenRow.querySelector(".esp-value-text-color");
+      if (valueTextColorInput) {
+        valueTextColorInput.addEventListener("input", (event) => {
+          cfg.valueTextColor = String(event.target.value || "#ffffff");
+          applyValueTextColor();
           syncEsp();
         });
       }
