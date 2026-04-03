@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.1.2
+// @version      1.1.3
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.1.2";
+    const CLIENT_VERSION = "1.1.3";
     return CLIENT_VERSION;
   }
 
@@ -1706,8 +1706,8 @@
     }
 
     .zyrox-search:focus {
-      border-color: rgba(255, 130, 130, 0.8);
-      box-shadow: 0 0 0 2px rgba(255, 61, 61, 0.22);
+      background: rgba(20, 16, 16, 0.85);
+      border-color: rgba(255, 130, 130, 0.6);
     }
 
     .zyrox-section { display: flex; flex-direction: column; gap: 7px; }
@@ -2034,6 +2034,75 @@
       border-radius: 0 0 8px 0;
       opacity: 0.9;
     }
+
+    /* Theme layout styles */
+    .zyrox-theme-layout {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      min-height: 0;
+      height: 100%;
+    }
+    .zyrox-theme-sidebar {
+      border-right: 1px solid rgba(255,255,255,.08);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--zyx-settings-sidebar-bg);
+      overflow-y: auto;
+    }
+    .zyrox-theme-sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .zyrox-theme-sidebar::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--zyx-outline-color) 50%, transparent);
+      border-radius: 999px;
+    }
+    .zyrox-theme-categories {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .zyrox-theme-category {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--zyx-settings-text);
+      background: rgba(0,0,0,.2);
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .zyrox-theme-category:hover {
+      background: var(--zyx-btn-hover-bg);
+      border-color: rgba(255,255,255,.2);
+    }
+    .zyrox-theme-category.active {
+      border-color: var(--zyx-outline-color);
+      background: color-mix(in srgb, var(--zyx-topbar-bg-start) 75%, transparent);
+      color: #fff;
+    }
+    .zyrox-theme-content {
+      padding: 14px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .zyrox-theme-content::-webkit-scrollbar {
+      width: 10px;
+    }
+    .zyrox-theme-content::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--zyx-outline-color) 70%, transparent);
+      border-radius: 999px;
+    }
+    .zyrox-theme-section {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .zyrox-theme-section.active {
+      display: flex;
+    }
   `;
 
   const root = document.createElement("div");
@@ -2133,152 +2202,176 @@
         </div>
       </div>
       <div class="zyrox-settings-pane hidden" data-pane="theme">
-        <div class="zyrox-settings-body">
-          <div class="zyrox-preset-header">Presets</div>
-          <div class="zyrox-preset-row">
-            <button type="button" class="zyrox-preset-btn" data-preset="default"><span class="preset-swatch" style="background:#ff3d3d"></span>Default</button>
-            <button type="button" class="zyrox-preset-btn" data-preset="green"><span class="preset-swatch" style="background:#2dff75"></span>Green</button>
-            <button type="button" class="zyrox-preset-btn" data-preset="ice"><span class="preset-swatch" style="background:#6cd8ff"></span>Ice</button>
-            <button type="button" class="zyrox-preset-btn" data-preset="grayscale"><span class="preset-swatch" style="background:#bfbfbf"></span>Greyscale</button>
+        <div class="zyrox-theme-layout">
+          <div class="zyrox-theme-sidebar">
+            <div class="zyrox-preset-header">Presets</div>
+            <div class="zyrox-preset-row">
+              <button type="button" class="zyrox-preset-btn" data-preset="default"><span class="preset-swatch" style="background:#ff3d3d"></span>Default</button>
+              <button type="button" class="zyrox-preset-btn" data-preset="green"><span class="preset-swatch" style="background:#2dff75"></span>Green</button>
+              <button type="button" class="zyrox-preset-btn" data-preset="ice"><span class="preset-swatch" style="background:#6cd8ff"></span>Ice</button>
+              <button type="button" class="zyrox-preset-btn" data-preset="grayscale"><span class="preset-swatch" style="background:#bfbfbf"></span>Greyscale</button>
+            </div>
+            <div class="zyrox-theme-categories">
+              <button class="zyrox-theme-category active" data-category="main-window">Main Window</button>
+              <button class="zyrox-theme-category" data-category="buttons-inputs">Buttons & Inputs</button>
+              <button class="zyrox-theme-category" data-category="typography">Typography</button>
+              <button class="zyrox-theme-category" data-category="icons-badges">Icons & Badges</button>
+              <button class="zyrox-theme-category" data-category="panels-modules">Panels & Modules</button>
+              <button class="zyrox-theme-category" data-category="settings-menu">Settings Menu</button>
+            </div>
           </div>
-          <div class="zyrox-subheading">Main Window</div>
-          <div class="zyrox-setting-card">
-            <label>Accent Color</label>
-            <input type="color" class="set-accent" value="#ff3d3d" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Background Gradient</label>
-            <span class="zyrox-gradient-pair">
-              <input type="color" class="set-shell-bg-start" value="#ff3d3d" />
-              <input type="color" class="set-shell-bg-end" value="#000000" />
-            </span>
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Top Bar Color</label>
-            <input type="color" class="set-topbar-color" value="#ff4a4a" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Text Color</label>
-            <input type="color" class="set-text" value="#d6d6df" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Panel Border</label>
-            <input type="color" class="set-border" value="#ff6f6f" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Background Opacity</label>
-            <input type="range" class="set-opacity" min="20" max="100" value="45" />
-          </div>
-          <div class="zyrox-subheading">Buttons & Inputs</div>
-          <div class="zyrox-setting-card">
-            <label>Outline Color</label>
-            <input type="color" class="set-outline-color" value="#ff5b5b" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Slider Color</label>
-            <input type="color" class="set-slider-color" value="#ff6b6b" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Checkmark Color</label>
-            <input type="color" class="set-checkmark-color" value="#ff6b6b" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Dropdown Background</label>
-            <input type="color" class="set-select-bg" value="#17171f" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Dropdown Text</label>
-            <input type="color" class="set-select-text" value="#ffe5e5" />
-          </div>
-          <div class="zyrox-subheading">Typography</div>
-          <div class="zyrox-setting-card">
-            <label>Font Family</label>
-            <select class="set-font">
-              <option value="Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" selected>Inter (Default)</option>
-              <option value="JetBrains Mono, 'Courier New', monospace">JetBrains Mono</option>
-              <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
-              <option value="Roboto, 'Helvetica Neue', Arial, sans-serif">Roboto</option>
-              <option value="'Open Sans', 'Helvetica Neue', Arial, sans-serif">Open Sans</option>
-              <option value="'Fira Code', 'Courier New', monospace">Fira Code</option>
-              <option value="Poppins, 'Helvetica Neue', Arial, sans-serif">Poppins</option>
-            </select>
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Muted Text</label>
-            <input type="color" class="set-muted-text" value="#9b9bab" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Label Accent</label>
-            <input type="color" class="set-accent-soft" value="#ffbdbd" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Search Text</label>
-            <input type="color" class="set-search-text" value="#ffe6e6" />
-          </div>
-          <div class="zyrox-subheading">Icons & Badges</div>
-          <div class="zyrox-setting-card">
-            <label>Icon Color</label>
-            <input type="color" class="set-icon-color" value="#ffdada" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Panel Count Text</label>
-            <input type="color" class="set-panel-count-text" value="#ffd9d9" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Panel Count Border</label>
-            <input type="color" class="set-panel-count-border" value="#ff6464" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Panel Count Background</label>
-            <input type="color" class="set-panel-count-bg" value="#1a1a1e" />
-          </div>
-          <div class="zyrox-subheading">Panels & Modules</div>
-          <div class="zyrox-setting-card">
-            <label>Module Bar Gradient</label>
-            <span class="zyrox-gradient-pair">
-              <input type="color" class="set-header-start" value="#ff4a4a" />
-              <input type="color" class="set-header-end" value="#3c1212" />
-            </span>
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Module Bar Text</label>
-            <input type="color" class="set-header-text" value="#ffffff" />
-          </div>
-          <div class="zyrox-subheading">Settings Menu</div>
-          <div class="zyrox-setting-card">
-            <label>Settings Header Gradient</label>
-            <span class="zyrox-gradient-pair">
-              <input type="color" class="set-settings-header-start" value="#ff3d3d" />
-              <input type="color" class="set-settings-header-end" value="#2d0c0c" />
-            </span>
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Settings Sidebar Tint</label>
-            <input type="color" class="set-settings-sidebar" value="#181820" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Settings Body Tint</label>
-            <input type="color" class="set-settings-body" value="#121216" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Settings Text Color</label>
-            <input type="color" class="set-settings-text" value="#ffe5e5" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Settings Subtext Color</label>
-            <input type="color" class="set-settings-subtext" value="#c2c2ce" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Settings Card Border</label>
-            <input type="color" class="set-settings-card-border" value="#ffffff" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Settings Card Background</label>
-            <input type="color" class="set-settings-card-bg" value="#ffffff" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>ESP Value Text Color</label>
-            <input type="color" class="set-esp-value-text-color" value="#ffffff" />
+          <div class="zyrox-theme-content">
+            <div class="zyrox-theme-section active" data-section="main-window">
+              <div class="zyrox-subheading">Main Window</div>
+              <div class="zyrox-setting-card">
+                <label>Accent Color</label>
+                <input type="color" class="set-accent" value="#ff3d3d" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Background Gradient</label>
+                <span class="zyrox-gradient-pair">
+                  <input type="color" class="set-shell-bg-start" value="#ff3d3d" />
+                  <input type="color" class="set-shell-bg-end" value="#000000" />
+                </span>
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Top Bar Color</label>
+                <input type="color" class="set-topbar-color" value="#ff4a4a" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Text Color</label>
+                <input type="color" class="set-text" value="#d6d6df" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Panel Border</label>
+                <input type="color" class="set-border" value="#ff6f6f" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Background Opacity</label>
+                <input type="range" class="set-opacity" min="20" max="100" value="45" />
+              </div>
+            </div>
+            <div class="zyrox-theme-section" data-section="buttons-inputs">
+              <div class="zyrox-subheading">Buttons & Inputs</div>
+              <div class="zyrox-setting-card">
+                <label>Outline Color</label>
+                <input type="color" class="set-outline-color" value="#ff5b5b" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Slider Color</label>
+                <input type="color" class="set-slider-color" value="#ff6b6b" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Checkmark Color</label>
+                <input type="color" class="set-checkmark-color" value="#ff6b6b" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Dropdown Background</label>
+                <input type="color" class="set-select-bg" value="#17171f" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Dropdown Text</label>
+                <input type="color" class="set-select-text" value="#ffe5e5" />
+              </div>
+            </div>
+            <div class="zyrox-theme-section" data-section="typography">
+              <div class="zyrox-subheading">Typography</div>
+              <div class="zyrox-setting-card">
+                <label>Font Family</label>
+                <select class="set-font">
+                  <option value="Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif" selected>Inter (Default)</option>
+                  <option value="JetBrains Mono, 'Courier New', monospace">JetBrains Mono</option>
+                  <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
+                  <option value="Roboto, 'Helvetica Neue', Arial, sans-serif">Roboto</option>
+                  <option value="'Open Sans', 'Helvetica Neue', Arial, sans-serif">Open Sans</option>
+                  <option value="'Fira Code', 'Courier New', monospace">Fira Code</option>
+                  <option value="Poppins, 'Helvetica Neue', Arial, sans-serif">Poppins</option>
+                </select>
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Muted Text</label>
+                <input type="color" class="set-muted-text" value="#9b9bab" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Label Accent</label>
+                <input type="color" class="set-accent-soft" value="#ffbdbd" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Search Text</label>
+                <input type="color" class="set-search-text" value="#ffe6e6" />
+              </div>
+            </div>
+            <div class="zyrox-theme-section" data-section="icons-badges">
+              <div class="zyrox-subheading">Icons & Badges</div>
+              <div class="zyrox-setting-card">
+                <label>Icon Color</label>
+                <input type="color" class="set-icon-color" value="#ffdada" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Panel Count Text</label>
+                <input type="color" class="set-panel-count-text" value="#ffd9d9" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Panel Count Border</label>
+                <input type="color" class="set-panel-count-border" value="#ff6464" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Panel Count Background</label>
+                <input type="color" class="set-panel-count-bg" value="#1a1a1e" />
+              </div>
+            </div>
+            <div class="zyrox-theme-section" data-section="panels-modules">
+              <div class="zyrox-subheading">Panels & Modules</div>
+              <div class="zyrox-setting-card">
+                <label>Module Bar Gradient</label>
+                <span class="zyrox-gradient-pair">
+                  <input type="color" class="set-header-start" value="#ff4a4a" />
+                  <input type="color" class="set-header-end" value="#3c1212" />
+                </span>
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Module Bar Text</label>
+                <input type="color" class="set-header-text" value="#ffffff" />
+              </div>
+            </div>
+            <div class="zyrox-theme-section" data-section="settings-menu">
+              <div class="zyrox-subheading">Settings Menu</div>
+              <div class="zyrox-setting-card">
+                <label>Settings Header Gradient</label>
+                <span class="zyrox-gradient-pair">
+                  <input type="color" class="set-settings-header-start" value="#ff3d3d" />
+                  <input type="color" class="set-settings-header-end" value="#2d0c0c" />
+                </span>
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Settings Sidebar Tint</label>
+                <input type="color" class="set-settings-sidebar" value="#181820" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Settings Body Tint</label>
+                <input type="color" class="set-settings-body" value="#121216" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Settings Text Color</label>
+                <input type="color" class="set-settings-text" value="#ffe5e5" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Settings Subtext Color</label>
+                <input type="color" class="set-settings-subtext" value="#c2c2ce" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Settings Card Border</label>
+                <input type="color" class="set-settings-card-border" value="#ffffff" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Settings Card Background</label>
+                <input type="color" class="set-settings-card-bg" value="#ffffff" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>ESP Value Text Color</label>
+                <input type="color" class="set-esp-value-text-color" value="#ffffff" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -3717,6 +3810,24 @@
     state.shellHeight = height;
     shell.style.width = `${width}px`;
     shell.style.height = `${height}px`;
+  });
+
+  // Theme category switching functionality
+  const themeCategories = [...settingsMenu.querySelectorAll(".zyrox-theme-category")];
+  const themeSections = [...settingsMenu.querySelectorAll(".zyrox-theme-section")];
+
+  themeCategories.forEach((category) => {
+    category.addEventListener("click", () => {
+      const targetCategory = category.dataset.category;
+      
+      // Update active category
+      themeCategories.forEach((cat) => cat.classList.toggle("active", cat === category));
+      
+      // Show corresponding section
+      themeSections.forEach((section) => {
+        section.classList.toggle("active", section.dataset.section === targetCategory);
+      });
+    });
   });
 
   }); // end DOMContentLoaded
