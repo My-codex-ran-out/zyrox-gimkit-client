@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.2.0
+// @version      1.2.1
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.2.0";
+    const CLIENT_VERSION = "1.2.1";
     return CLIENT_VERSION;
   }
 
@@ -1879,7 +1879,7 @@
     .zyrox-config-header { padding: 11px 13px; border-bottom: 1px solid rgba(255,255,255,.09); background: linear-gradient(90deg, var(--zyx-settings-header-start), var(--zyx-settings-header-end)); }
     .zyrox-config-title { color: var(--zyx-settings-text); font-size: 14px; font-weight: 700; margin-bottom: 3px; }
     .zyrox-config-sub { color: var(--zyx-settings-subtext); font-size: 12px; }
-    .zyrox-config-body { padding: 13px; }
+    .zyrox-config-body { padding: 13px; color: var(--zyx-settings-text); }
     .zyrox-config-row { display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--zyx-settings-text); font-size:14px; }
     .zyrox-config-actions { display: flex; align-items: center; gap: 6px; }
 
@@ -3110,6 +3110,8 @@
           panelText: "#d9ffe8", panelBorder: "#5fff99", panelBg: "#04110a", slider: "#2dff75", checkmark: "#2dff75",
           selectBg: "#111e16", selectText: "#d7ffe6",
           headerStart: "#2dff75", headerEnd: "#0f2f1b", headerText: "#f0fff4",
+          settingsText: "#d7ffe6", settingsSubtext: "#a7cfb7", settingsSidebar: "#102016", settingsBody: "#0d1510",
+          settingsCardBorder: "#79d6a0", settingsCardBg: "#12301f",
           settingsHeaderStart: "#2dff75", settingsHeaderEnd: "#0f2f1b", espValueTextColor: "#ffffff",
           font: "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
         };
@@ -3121,6 +3123,8 @@
           panelText: "#e1f4ff", panelBorder: "#8fd7ff", panelBg: "#071019", slider: "#7bdfff", checkmark: "#7bdfff",
           selectBg: "#0c1c26", selectText: "#d7edff",
           headerStart: "#6cd8ff", headerEnd: "#133042", headerText: "#f4fbff",
+          settingsText: "#d7edff", settingsSubtext: "#9db4c6", settingsSidebar: "#10202c", settingsBody: "#0e141a",
+          settingsCardBorder: "#90cae8", settingsCardBg: "#173247",
           settingsHeaderStart: "#6cd8ff", settingsHeaderEnd: "#133042", espValueTextColor: "#ffffff",
           font: "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
         };
@@ -3132,6 +3136,8 @@
           panelText: "#efefef", panelBorder: "#a0a0a0", panelBg: "#0f0f0f", slider: "#c4c4c4", checkmark: "#d0d0d0",
           selectBg: "#1b1b1b", selectText: "#efefef",
           headerStart: "#8f8f8f", headerEnd: "#1d1d1d", headerText: "#ffffff",
+          settingsText: "#efefef", settingsSubtext: "#b2b2b2", settingsSidebar: "#202020", settingsBody: "#181818",
+          settingsCardBorder: "#b7b7b7", settingsCardBg: "#313131",
           settingsHeaderStart: "#8f8f8f", settingsHeaderEnd: "#1d1d1d", espValueTextColor: "#ffffff",
           font: "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
         };
@@ -3143,6 +3149,8 @@
         panelText: "#ffd9d9", panelBorder: "#ff6464", panelBg: "#1a1a1e", slider: "#ff6b6b", checkmark: "#ff6b6b",
         selectBg: "#17171f", selectText: "#ffe5e5",
         headerStart: "#ff4a4a", headerEnd: "#3c1212", headerText: "#ffffff",
+        settingsText: "#ffe5e5", settingsSubtext: "#c2c2ce", settingsSidebar: "#181820", settingsBody: "#121216",
+        settingsCardBorder: "#ffffff", settingsCardBg: "#ffffff",
         settingsHeaderStart: "#ff3d3d", settingsHeaderEnd: "#2d0c0c", espValueTextColor: "#ffffff",
         font: "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
       };
@@ -3172,6 +3180,12 @@
     headerTextInput.value = preset.headerText;
     settingsHeaderStartInput.value = preset.settingsHeaderStart;
     settingsHeaderEndInput.value = preset.settingsHeaderEnd;
+    settingsSidebarInput.value = preset.settingsSidebar;
+    settingsBodyInput.value = preset.settingsBody;
+    settingsTextInput.value = preset.settingsText;
+    settingsSubtextInput.value = preset.settingsSubtext;
+    settingsCardBorderInput.value = preset.settingsCardBorder;
+    settingsCardBgInput.value = preset.settingsCardBg;
     espValueTextColorInput.value = preset.espValueTextColor;
     applyAppearance();
   }
@@ -3444,6 +3458,8 @@
   mutedTextInput.addEventListener("input", applyAppearance);
   accentSoftInput.addEventListener("input", applyAppearance);
   searchTextInput.addEventListener("input", applyAppearance);
+  fontInput.addEventListener("input", applyAppearance);
+  fontInput.addEventListener("change", applyAppearance);
   headerStartInput.addEventListener("input", applyAppearance);
   headerEndInput.addEventListener("input", applyAppearance);
   headerTextInput.addEventListener("input", applyAppearance);
