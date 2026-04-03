@@ -1840,6 +1840,19 @@
     }
     .zyrox-setting-card input[type='range'] { width: 190px; accent-color: var(--zyx-slider-color); }
     .zyrox-setting-card input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--zyx-checkmark-color); }
+    .zyrox-setting-card select {
+      border: 1px solid var(--zyx-settings-card-border);
+      background: color-mix(in srgb, var(--zyx-settings-sidebar-bg) 55%, transparent);
+      color: var(--zyx-settings-text);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      min-height: 30px;
+    }
+    .zyrox-setting-card select:focus {
+      outline: 1px solid var(--zyx-outline-color);
+      outline-offset: 1px;
+    }
     .zyrox-gradient-pair { display: inline-flex; align-items: center; gap: 8px; }
     .zyrox-preset-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
     .zyrox-preset-btn { border: 1px solid var(--zyx-outline-color); background: rgba(0,0,0,.26); color: var(--zyx-settings-text); border-radius: 8px; padding: 6px 10px; font-size: 11px; cursor: pointer; }
@@ -2436,12 +2449,16 @@
               <option value="neon" ${cfg.offscreenTheme === "neon" ? "selected" : ""}>Neon</option>
             </select>
           </label>
-          <label>Tracer Width <input type="range" class="esp-tracer-width" min="1" max="8" step="1" value="${cfg.tracerWidth}" /></label>
-          <span class="esp-tracer-width-value">${cfg.tracerWidth}px</span>
-          <input type="color" class="esp-tracer-color" value="${cfg.tracerColor}" />
-          <label>Arrow Size <input type="range" class="esp-arrow-size" min="8" max="30" step="1" value="${cfg.arrowSize}" /></label>
-          <span class="esp-arrow-size-value">${cfg.arrowSize}px</span>
-          <input type="color" class="esp-arrow-color" value="${cfg.arrowColor}" />
+          <span class="esp-tracer-controls" style="display:flex;align-items:center;gap:10px;">
+            <label>Tracer Width <input type="range" class="esp-tracer-width" min="1" max="8" step="1" value="${cfg.tracerWidth}" /></label>
+            <span class="esp-tracer-width-value">${cfg.tracerWidth}px</span>
+            <input type="color" class="esp-tracer-color" value="${cfg.tracerColor}" />
+          </span>
+          <span class="esp-arrow-controls" style="display:flex;align-items:center;gap:10px;">
+            <label>Arrow Size <input type="range" class="esp-arrow-size" min="8" max="30" step="1" value="${cfg.arrowSize}" /></label>
+            <span class="esp-arrow-size-value">${cfg.arrowSize}px</span>
+            <input type="color" class="esp-arrow-color" value="${cfg.arrowColor}" />
+          </span>
           <button type="button" class="zyrox-btn esp-indicator-preset" data-preset="classic">Classic Preset</button>
           <button type="button" class="zyrox-btn esp-indicator-preset" data-preset="neon">Neon Preset</button>
         </div>
@@ -2489,9 +2506,17 @@
       bindColor(namesRow, ".esp-name-color", "nameColor");
 
       const styleInput = offscreenRow.querySelector(".esp-offscreen-style");
+      const tracerControls = offscreenRow.querySelector(".esp-tracer-controls");
+      const arrowControls = offscreenRow.querySelector(".esp-arrow-controls");
+      const refreshIndicatorModeVisibility = () => {
+        const mode = cfg.offscreenStyle === "arrows" ? "arrows" : "tracers";
+        if (tracerControls) tracerControls.style.display = mode === "tracers" ? "flex" : "none";
+        if (arrowControls) arrowControls.style.display = mode === "arrows" ? "flex" : "none";
+      };
       if (styleInput) {
         styleInput.addEventListener("change", (event) => {
           cfg.offscreenStyle = String(event.target.value || "tracers");
+          refreshIndicatorModeVisibility();
           syncEsp();
         });
       }
@@ -2506,6 +2531,7 @@
       bindColor(offscreenRow, ".esp-tracer-color", "tracerColor");
       bindSlider(offscreenRow, ".esp-arrow-size", "arrowSize", ".esp-arrow-size-value");
       bindColor(offscreenRow, ".esp-arrow-color", "arrowColor");
+      refreshIndicatorModeVisibility();
 
       for (const presetButton of offscreenRow.querySelectorAll(".esp-indicator-preset")) {
         presetButton.addEventListener("click", () => {
