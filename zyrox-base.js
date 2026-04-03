@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.1.7
+// @version      1.1.8
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.1.7";
+    const CLIENT_VERSION = "1.1.8";
     return CLIENT_VERSION;
   }
 
@@ -972,7 +972,7 @@
   }
 
   function createEspCanvas() {
-    if (espState.canvas) {
+    if (espState.canvas?.parentNode) {
       espLog("Canvas already exists; reusing existing canvas.");
       return;
     }
@@ -990,6 +990,12 @@
     document.body.appendChild(canvas);
     espState.canvas = canvas;
     espState.ctx = canvas.getContext("2d");
+    if (!espState.ctx) {
+      espLog("Failed to get canvas 2D context");
+      canvas.remove();
+      espState.canvas = null;
+      return;
+    }
     espLog("Canvas created");
   }
 
@@ -1002,7 +1008,7 @@
   }
 
   function resizeEspCanvas() {
-    if (!espState.canvas) return;
+    if (!espState.canvas?.parentNode) return;
     espState.canvas.width = window.innerWidth;
     espState.canvas.height = window.innerHeight;
     espLog(`Canvas resized to ${espState.canvas.width}x${espState.canvas.height}`);
@@ -1158,8 +1164,11 @@
     }
     const camera = stores?.phaser?.scene?.cameras?.cameras?.[0];
     const me = getMainCharacter(stores);
+    if (!camera || !me) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!camera || !me) return;
 
     const myTeam = getCharacterTeam(me);
     const espCfg = getEspRenderConfig();
