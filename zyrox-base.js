@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.1.3
+// @version      1.1.4
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.1.3";
+    const CLIENT_VERSION = "1.1.4";
     return CLIENT_VERSION;
   }
 
@@ -1706,8 +1706,8 @@
     }
 
     .zyrox-search:focus {
-      background: rgba(20, 16, 16, 0.85);
-      border-color: rgba(255, 130, 130, 0.6);
+      background: rgba(15, 12, 12, 0.8);
+      border-color: rgba(255, 255, 255, 0.15);
     }
 
     .zyrox-section { display: flex; flex-direction: column; gap: 7px; }
@@ -2182,7 +2182,6 @@
     <div class="zyrox-settings-layout">
       <div class="zyrox-settings-sidebar">
         <button class="zyrox-settings-tab active" type="button" data-tab="controls">Controls</button>
-        <button class="zyrox-settings-tab" type="button" data-tab="theme">Theme</button>
         <button class="zyrox-settings-tab" type="button" data-tab="appearance">Appearance</button>
         <button class="zyrox-settings-tab" type="button" data-tab="about">About</button>
       </div>
@@ -2201,7 +2200,7 @@
           </div>
         </div>
       </div>
-      <div class="zyrox-settings-pane hidden" data-pane="theme">
+      <div class="zyrox-settings-pane hidden" data-pane="appearance">
         <div class="zyrox-theme-layout">
           <div class="zyrox-theme-sidebar">
             <div class="zyrox-preset-header">Presets</div>
@@ -2211,8 +2210,16 @@
               <button type="button" class="zyrox-preset-btn" data-preset="ice"><span class="preset-swatch" style="background:#6cd8ff"></span>Ice</button>
               <button type="button" class="zyrox-preset-btn" data-preset="grayscale"><span class="preset-swatch" style="background:#bfbfbf"></span>Greyscale</button>
             </div>
+            <div class="zyrox-setting-card" style="margin: 12px 0; border: 1px solid var(--zyx-settings-card-border); border-radius: 10px; padding: 8px 10px; background: var(--zyx-settings-card-bg);">
+              <label style="margin-bottom: 6px; display: block;">Display Mode</label>
+              <div class="zyrox-settings-actions-group">
+                <button class="zyrox-btn set-display-mode active" data-display-mode="merged" type="button">Merged</button>
+                <button class="zyrox-btn set-display-mode" data-display-mode="loose" type="button">Loose</button>
+              </div>
+            </div>
             <div class="zyrox-theme-categories">
-              <button class="zyrox-theme-category active" data-category="main-window">Main Window</button>
+              <button class="zyrox-theme-category active" data-category="layout-sizing">Layout & Sizing</button>
+              <button class="zyrox-theme-category" data-category="main-window">Main Window</button>
               <button class="zyrox-theme-category" data-category="buttons-inputs">Buttons & Inputs</button>
               <button class="zyrox-theme-category" data-category="typography">Typography</button>
               <button class="zyrox-theme-category" data-category="icons-badges">Icons & Badges</button>
@@ -2221,7 +2228,26 @@
             </div>
           </div>
           <div class="zyrox-theme-content">
-            <div class="zyrox-theme-section active" data-section="main-window">
+            <div class="zyrox-theme-section active" data-section="layout-sizing">
+              <div class="zyrox-subheading">Layout & Sizing</div>
+              <div class="zyrox-setting-card">
+                <label>UI Scale</label>
+                <input type="range" class="set-scale" min="80" max="130" value="100" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Corner Radius</label>
+                <input type="range" class="set-radius" min="6" max="20" value="14" />
+              </div>
+              <div class="zyrox-setting-card">
+                <label>Panel Blur</label>
+                <input type="range" class="set-blur" min="0" max="16" value="10" />
+              </div>
+              <div class="zyrox-subheading">Motion</div>
+              <div class="zyrox-setting-card">
+                <label>Module Hover Shift</label>
+                <input type="range" class="set-hover-shift" min="0" max="6" value="2" />
+              </div>
+            </div>
               <div class="zyrox-subheading">Main Window</div>
               <div class="zyrox-setting-card">
                 <label>Accent Color</label>
@@ -2372,35 +2398,6 @@
                 <input type="color" class="set-esp-value-text-color" value="#ffffff" />
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-      <div class="zyrox-settings-pane hidden" data-pane="appearance">
-        <div class="zyrox-settings-body">
-          <div class="zyrox-subheading">Layout</div>
-          <div class="zyrox-setting-card">
-            <label>Display Mode</label>
-            <div class="zyrox-settings-actions-group">
-              <button class="zyrox-btn set-display-mode active" data-display-mode="merged" type="button">Merged</button>
-              <button class="zyrox-btn set-display-mode" data-display-mode="loose" type="button">Loose</button>
-            </div>
-          </div>
-          <div class="zyrox-setting-card">
-            <label>UI Scale</label>
-            <input type="range" class="set-scale" min="80" max="130" value="100" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Corner Radius</label>
-            <input type="range" class="set-radius" min="6" max="20" value="14" />
-          </div>
-          <div class="zyrox-setting-card">
-            <label>Panel Blur</label>
-            <input type="range" class="set-blur" min="0" max="16" value="10" />
-          </div>
-          <div class="zyrox-subheading">Motion</div>
-          <div class="zyrox-setting-card">
-            <label>Module Hover Shift</label>
-            <input type="range" class="set-hover-shift" min="0" max="6" value="2" />
           </div>
         </div>
       </div>
