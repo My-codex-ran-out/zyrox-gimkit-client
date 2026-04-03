@@ -2279,10 +2279,12 @@
     if (moduleInstance.enabled) {
       moduleInstance.disable();
       item.classList.remove("active");
+      state.enabledModules.delete(moduleName);
       if (moduleName === "Auto Answer") stopAutoAnswer();
     } else {
       moduleInstance.enable();
       item.classList.add("active");
+      state.enabledModules.add(moduleName);
       if (moduleName === "Auto Answer") startAutoAnswer();
     }
   }
