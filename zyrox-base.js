@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      0.9.6
+// @version      0.9.9
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -295,11 +295,9 @@
         start(speed = 1000) {
           if (_intervalId) clearInterval(_intervalId);
           _intervalId = setInterval(answerQuestion, speed);
-          console.log(LOG, "Started auto-answer", speed + "ms");
         },
         stop() {
           if (_intervalId) { clearInterval(_intervalId); _intervalId = null; }
-          console.log(LOG, "Stopped auto-answer");
         },
       };
       console.log(LOG, "Page context ready, waiting for module toggle.");
@@ -384,7 +382,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "0.9.6";
+    const CLIENT_VERSION = "0.9.9";
     return CLIENT_VERSION;
   }
 
@@ -2283,8 +2281,10 @@
               cfg[setting.id] = newVal;
               if (valueLabel) valueLabel.textContent = newVal + "ms";
               if (moduleName === "Auto Answer" && setting.id === "speed") {
-                // Live-update the interval speed without requiring a toggle
-                window.__zyroxAutoAnswer?.start(newVal);
+                // Live-update the interval speed only while Auto Answer is enabled
+                if (state.enabledModules.has("Auto Answer")) {
+                  window.__zyroxAutoAnswer?.start(newVal);
+                }
               }
             });
           }
