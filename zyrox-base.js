@@ -2194,6 +2194,7 @@
       <div class="zyrox-settings-sidebar">
         <button class="zyrox-settings-tab active" type="button" data-tab="controls">Controls</button>
         <button class="zyrox-settings-tab" type="button" data-tab="theme">Theme</button>
+        <button class="zyrox-settings-tab" type="button" data-tab="appearance">Appearance</button>
         <button class="zyrox-settings-tab" type="button" data-tab="about">About</button>
       </div>
       <div class="zyrox-settings-pane" data-pane="controls">
@@ -2225,6 +2226,10 @@
             <button class="zyrox-btn set-display-mode active" data-display-mode="merged" type="button">Merged</button>
             <button class="zyrox-btn set-display-mode" data-display-mode="loose" type="button">Loose</button>
           </div>
+        </div>
+      </div>
+      <div class="zyrox-settings-pane hidden" data-pane="appearance">
+        <div class="zyrox-settings-body">
           <div class="zyrox-subheading">Layout & Sizing</div>
           <div class="zyrox-setting-card">
             <label>UI Scale</label>
@@ -2346,7 +2351,6 @@
                 <label>Module Bar Text</label>
                 <input type="color" class="set-header-text" value="#ffffff" />
               </div>
-            </div>
           <div class="zyrox-subheading">Settings Menu</div>
               <div class="zyrox-setting-card">
                 <label>Settings Header Gradient</label>
