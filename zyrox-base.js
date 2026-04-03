@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.0.1
+// @version      1.0.2
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.0.1";
+    const CLIENT_VERSION = "1.0.2";
     return CLIENT_VERSION;
   }
 
@@ -960,6 +960,8 @@
     canvas: null,
     ctx: null,
     intervalId: null,
+    stores: null,
+    storesPromise: null,
     seenPlayers: new Map(),
     waitLogTick: 0,
   };
@@ -1006,6 +1008,37 @@
     espLog(`Canvas resized to ${espState.canvas.width}x${espState.canvas.height}`);
   }
 
+  async function resolveEspStores() {
+    if (espState.stores) return espState.stores;
+    if (espState.storesPromise) return espState.storesPromise;
+    espState.storesPromise = (async () => {
+      if (!document.body) {
+        await new Promise((resolve) => window.addEventListener("DOMContentLoaded", resolve, { once: true }));
+      }
+      const moduleScript = document.querySelector("script[src][type='module']");
+      if (!moduleScript?.src) throw new Error("Failed to find game module script");
+
+      const response = await fetch(moduleScript.src);
+      const text = await response.text();
+      const gameScriptUrl = text.match(/FixSpinePlugin-[^.]+\.js/)?.[0];
+      if (!gameScriptUrl) throw new Error("Failed to find game script URL");
+
+      const gameScript = await import(`/assets/${gameScriptUrl}`);
+      const stores = Object.values(gameScript).find((value) => value && value.assignment);
+      if (!stores) throw new Error("Failed to resolve stores export");
+
+      window.stores = stores;
+      espState.stores = stores;
+      espLog("Resolved stores via module import");
+      return stores;
+    })();
+    try {
+      return await espState.storesPromise;
+    } finally {
+      espState.storesPromise = null;
+    }
+  }
+
   function getCharacterPosition(character) {
     const x = Number(character?.x ?? character?.position?.x ?? character?.body?.x);
     const y = Number(character?.y ?? character?.position?.y ?? character?.body?.y);
@@ -1013,87 +1046,74 @@
     return { x, y };
   }
 
-  function getCharacterName(character, fallbackId) {
-    return String(character?.name ?? character?.displayName ?? character?.username ?? fallbackId ?? "Unknown");
+  function getCharacters(stores) {
+    const manager = stores?.phaser?.scene?.characterManager;
+    const map = manager?.characters;
+    if (!map) return [];
+    if (typeof map.values === "function") return Array.from(map.values());
+    if (Array.isArray(map)) return map;
+    return Object.values(map);
   }
 
-  function getEspSnapshotFromBridge() {
-    const shared = window.__zyroxEspShared;
-    if (!shared || !shared.ready) return null;
-    return shared;
+  function getMainCharacter(stores) {
+    const mainId = stores?.phaser?.mainCharacter?.id;
+    const manager = stores?.phaser?.scene?.characterManager;
+    const map = manager?.characters;
+    if (!map) return null;
+    if (mainId != null && typeof map.get === "function") return map.get(mainId) || null;
+    return getCharacters(stores).find((character) => character?.id === mainId || character?.characterId === mainId) || null;
   }
 
-  function processEspPlayers(snapshot) {
-    const localPlayerId = snapshot?.localPlayerId ?? null;
-    const localTeamId = snapshot?.localTeamId ?? null;
-    if (localPlayerId == null) return [];
-    const camX = Number(snapshot?.camera?.midX);
-    const camY = Number(snapshot?.camera?.midY);
-    const zoom = Number(snapshot?.camera?.zoom ?? 1);
-    if (!Number.isFinite(camX) || !Number.isFinite(camY)) return [];
-
-    const playersSource = Array.isArray(snapshot?.players) ? snapshot.players : [];
-    const framePlayers = [];
-    const currentIds = new Set();
-    for (const character of playersSource) {
-      const id = String(character?.id ?? character?.playerId ?? character?.name ?? "unknown");
-      if (id === String(localPlayerId)) continue;
-      currentIds.add(id);
-      const pos = getCharacterPosition(character);
-      if (!pos) continue;
-      const name = getCharacterName(character, id);
-      const isTeammate = localTeamId != null && localTeamId === character?.teamId;
-      const dx = pos.x - camX;
-      const dy = pos.y - camY;
-      const angle = Math.atan2(dy, dx);
-      const distance = Math.hypot(dx, dy) * (Number.isFinite(zoom) && zoom > 0 ? zoom : 1);
-      const screenX = dx * zoom + espState.canvas.width / 2;
-      const screenY = dy * zoom + espState.canvas.height / 2;
-      const onScreen = screenX >= 0 && screenX <= espState.canvas.width && screenY >= 0 && screenY <= espState.canvas.height;
-      framePlayers.push({
-        id,
-        name,
-        isTeammate,
-        angle,
-        distance,
-        screenX,
-        screenY,
-        onScreen,
-        zoom,
-      });
-      espState.seenPlayers.set(id, { name, x: pos.x, y: pos.y, teamId: character?.teamId ?? null });
-    }
-
-    for (const [knownId] of espState.seenPlayers.entries()) {
-      if (!currentIds.has(knownId)) {
-        espState.seenPlayers.delete(knownId);
-      }
-    }
-    return framePlayers;
+  function getCharacterTeam(character) {
+    return character?.teamId ?? character?.team?.id ?? character?.state?.teamId ?? character?.data?.teamId ?? null;
   }
 
-  function renderEspPlayers(players) {
+  function getCharacterName(character) {
+    return character?.name ?? character?.displayName ?? character?.state?.name ?? "Player";
+  }
+
+  function renderEspPlayers(stores) {
     const ctx = espState.ctx;
     const canvas = espState.canvas;
     if (!ctx || !canvas) {
       espLog("Missing data: no canvas/context; rendering skip.");
       return;
     }
+    const camera = stores?.phaser?.scene?.cameras?.cameras?.[0];
+    const me = getMainCharacter(stores);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (const player of players) {
-      const color = player.isTeammate ? "green" : "red";
-      if (player.onScreen) {
-        const boxSize = Math.max(24, 80 / (player.zoom || 1));
+    if (!camera || !me) return;
+
+    const myTeam = getCharacterTeam(me);
+    const camX = Number(camera?.midPoint?.x);
+    const camY = Number(camera?.midPoint?.y);
+    const zoom = Number(camera?.zoom ?? 1) || 1;
+    if (!Number.isFinite(camX) || !Number.isFinite(camY)) return;
+
+    for (const character of getCharacters(stores)) {
+      if (!character || character === me) continue;
+      const pos = getCharacterPosition(character);
+      if (!pos) continue;
+      const angle = Math.atan2(pos.y - camY, pos.x - camX);
+      const distance = Math.hypot(pos.x - camX, pos.y - camY) * zoom;
+      const screenX = (pos.x - camX) * zoom + canvas.width / 2;
+      const screenY = (pos.y - camY) * zoom + canvas.height / 2;
+      const onScreen = screenX >= 0 && screenX <= canvas.width && screenY >= 0 && screenY <= canvas.height;
+      const isTeammate = myTeam !== null && getCharacterTeam(character) === myTeam;
+      const color = isTeammate ? "green" : "red";
+
+      if (onScreen) {
+        const boxSize = Math.max(24, 80 / zoom);
         ctx.beginPath();
         ctx.lineWidth = 3;
         ctx.strokeStyle = color;
-        ctx.strokeRect(player.screenX - boxSize / 2, player.screenY - boxSize / 2, boxSize, boxSize);
+        ctx.strokeRect(screenX - boxSize / 2, screenY - boxSize / 2, boxSize, boxSize);
       } else {
         const margin = 20;
         const halfW = canvas.width / 2 - margin;
         const halfH = canvas.height / 2 - margin;
-        const dx = Math.cos(player.angle);
-        const dy = Math.sin(player.angle);
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
         const scale = Math.min(
           Math.abs(halfW / (dx || 0.0001)),
           Math.abs(halfH / (dy || 0.0001))
@@ -1113,28 +1133,23 @@
       ctx.font = "20px Verdana";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const labelX = player.onScreen
-        ? player.screenX
-        : Math.cos(player.angle) * Math.min(250, player.distance) + canvas.width / 2;
-      const labelY = player.onScreen
-        ? (player.screenY - 18)
-        : Math.sin(player.angle) * Math.min(250, player.distance) + canvas.height / 2;
-      ctx.fillText(`${player.name} (${Math.floor(player.distance)})`, labelX, labelY);
+      const labelX = onScreen ? screenX : Math.cos(angle) * Math.min(250, distance) + canvas.width / 2;
+      const labelY = onScreen ? (screenY - 18) : Math.sin(angle) * Math.min(250, distance) + canvas.height / 2;
+      ctx.fillText(`${getCharacterName(character)} (${Math.floor(distance)})`, labelX, labelY);
     }
   }
 
   function renderEspTick() {
     if (!espState.enabled || !espState.ctx || !espState.canvas) return;
-    const snapshot = getEspSnapshotFromBridge();
-    if (!snapshot) {
+    const stores = espState.stores ?? window.stores;
+    if (!stores) {
       espState.waitLogTick += 1;
-      if (espState.waitLogTick % 60 === 0) espLog("Waiting for serializer.state/playerId/stores.phaser...");
+      if (espState.waitLogTick % 60 === 0) espLog("Waiting for stores...");
       espState.ctx.clearRect(0, 0, espState.canvas.width, espState.canvas.height);
       return;
     }
     espState.waitLogTick = 0;
-    const players = processEspPlayers(snapshot);
-    renderEspPlayers(players);
+    renderEspPlayers(stores);
   }
 
   function startEsp() {
@@ -1146,6 +1161,7 @@
     espLog("ESP initialized");
     createEspCanvas();
     resizeEspCanvas();
+    resolveEspStores().catch((error) => espLog("Failed to resolve stores", error));
     if (espState.intervalId != null) {
       clearInterval(espState.intervalId);
       espState.intervalId = null;
