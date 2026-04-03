@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.1.0
+// @version      1.1.1
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.1.0";
+    const CLIENT_VERSION = "1.1.1";
     return CLIENT_VERSION;
   }
 
@@ -1092,19 +1092,36 @@
     return map.get(id) || map.get(String(id)) || null;
   }
 
+  function findSerializerCharacterByPosition(character) {
+    const map = window?.serializer?.state?.characters?.$items;
+    if (!map || typeof map.values !== "function") return null;
+    const x = Number(character?.x ?? character?.position?.x);
+    const y = Number(character?.y ?? character?.position?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    for (const candidate of map.values()) {
+      const cx = Number(candidate?.x ?? candidate?.position?.x);
+      const cy = Number(candidate?.y ?? candidate?.position?.y);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+      if (Math.abs(cx - x) < 0.5 && Math.abs(cy - y) < 0.5) return candidate;
+    }
+    return null;
+  }
+
   function getCharacterName(character, fallbackId = null) {
     const id = getCharacterId(character) ?? fallbackId;
-    const serializerCharacter = getSerializerCharacterById(id);
+    const serializerCharacter = getSerializerCharacterById(id) ?? findSerializerCharacterByPosition(character);
     return character?.name
       ?? character?.displayName
       ?? character?.state?.name
       ?? character?.username
       ?? character?.playerName
       ?? character?.profile?.name
+      ?? character?.meta?.name
+      ?? character?.data?.name
       ?? serializerCharacter?.name
       ?? serializerCharacter?.displayName
       ?? serializerCharacter?.username
-      ?? String(fallbackId ?? "Player");
+      ?? "Player";
   }
 
   function getEspRenderConfig() {
@@ -1114,6 +1131,7 @@
       hitboxWidth: 3,
       hitboxColor: "#ff3b3b",
       names: true,
+      namesDistanceOnly: false,
       nameSize: 20,
       nameColor: "#000000",
       offscreenStyle: "tracers",
@@ -1147,6 +1165,7 @@
     const espCfg = getEspRenderConfig();
     const showHitbox = espCfg.hitbox !== false;
     const showNames = espCfg.names !== false;
+    const namesDistanceOnly = espCfg.namesDistanceOnly === true;
     const offscreenStyle = espCfg.offscreenStyle === "arrows" || espCfg.offscreenStyle === "none"
       ? espCfg.offscreenStyle
       : "tracers";
@@ -1263,7 +1282,9 @@
       ctx.textBaseline = "middle";
       const labelX = onScreen ? screenX : Math.cos(angle) * Math.min(250, distance) + canvas.width / 2;
       const labelY = onScreen ? (screenY - 18) : Math.sin(angle) * Math.min(250, distance) + canvas.height / 2;
-      ctx.fillText(`${getCharacterName(character, characterId)} (${Math.floor(distance)})`, labelX, labelY);
+      const distanceText = `${Math.floor(distance)}`;
+      const labelText = namesDistanceOnly ? distanceText : `${getCharacterName(character, characterId)} (${distanceText})`;
+      ctx.fillText(labelText, labelX, labelY);
     }
   }
 
@@ -1353,6 +1374,7 @@
                 { id: "hitboxWidth", label: "Hitbox Width", type: "slider", min: 1, max: 10, step: 1, default: 3, unit: "px" },
                 { id: "hitboxColor", label: "Hitbox Color", type: "color", default: "#ff3b3b" },
                 { id: "names", label: "Names", type: "checkbox", default: true },
+                { id: "namesDistanceOnly", label: "Distance Only", type: "checkbox", default: false },
                 { id: "nameSize", label: "Name Size", type: "slider", min: 10, max: 32, step: 1, default: 20, unit: "px" },
                 { id: "nameColor", label: "Name Color", type: "color", default: "#000000" },
                 {
@@ -2545,6 +2567,7 @@
       const namesRow = makeRow("Names", `
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="esp-names-enabled" ${cfg.names ? "checked" : ""} /> Enabled</label>
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="esp-names-distance-only" ${cfg.namesDistanceOnly ? "checked" : ""} /> Distance Only</label>
           <label>Size <input type="range" class="esp-name-size" min="10" max="32" step="1" value="${cfg.nameSize}" /></label>
           <span class="esp-name-size-value esp-value-text">${cfg.nameSize}px</span>
           <input type="color" class="esp-name-color" value="${cfg.nameColor}" />
@@ -2636,6 +2659,7 @@
       bindColor(hitboxRow, ".esp-hitbox-color", "hitboxColor");
 
       bindCheckbox(namesRow, ".esp-names-enabled", "names");
+      bindCheckbox(namesRow, ".esp-names-distance-only", "namesDistanceOnly");
       bindSlider(namesRow, ".esp-name-size", "nameSize", ".esp-name-size-value");
       bindColor(namesRow, ".esp-name-color", "nameColor");
 
