@@ -1082,10 +1082,12 @@
       nameColor: "#000000",
       offscreenStyle: "tracers",
       offscreenTheme: "classic",
+      alwaysTracer: false,
       tracerWidth: 3,
       tracerColor: "#ff3b3b",
       arrowSize: 14,
       arrowColor: "#ff3b3b",
+      arrowStyle: "regular",
     };
     const liveCfg = window.__zyroxEspConfig;
     if (liveCfg && typeof liveCfg === "object") return { ...defaults, ...liveCfg };
@@ -1112,6 +1114,8 @@
       ? espCfg.offscreenStyle
       : "tracers";
     const offscreenTheme = espCfg.offscreenTheme || "classic";
+    const alwaysTracer = espCfg.alwaysTracer === true;
+    const arrowStyle = ["regular", "dot", "modern"].includes(espCfg.arrowStyle) ? espCfg.arrowStyle : "regular";
     const camX = Number(camera?.midPoint?.x);
     const camY = Number(camera?.midPoint?.y);
     const zoom = Number(camera?.zoom ?? 1) || 1;
@@ -1142,7 +1146,12 @@
         ctx.lineWidth = tracerWidth;
         ctx.strokeStyle = hitboxColor;
         ctx.strokeRect(screenX - boxSize / 2, screenY - boxSize / 2, boxSize, boxSize);
-      } else if (!onScreen && offscreenStyle !== "none") {
+      }
+
+      const shouldDrawOffscreen = !onScreen && offscreenStyle !== "none";
+      const shouldDrawTracer = offscreenStyle === "tracers" && (alwaysTracer || !onScreen);
+
+      if (shouldDrawOffscreen || shouldDrawTracer) {
         const margin = 20;
         const halfW = canvas.width / 2 - margin;
         const halfH = canvas.height / 2 - margin;
@@ -1155,11 +1164,11 @@
         const endX = canvas.width / 2 + dx * scale;
         const endY = canvas.height / 2 + dy * scale;
 
-        if (offscreenStyle === "tracers") {
+        if (shouldDrawTracer) {
           ctx.save();
           ctx.beginPath();
           ctx.moveTo(canvas.width / 2, canvas.height / 2);
-          ctx.lineTo(endX, endY);
+          ctx.lineTo(onScreen ? screenX : endX, onScreen ? screenY : endY);
           ctx.lineWidth = tracerWidth;
           ctx.strokeStyle = tracerColor;
           if (offscreenTheme === "dashed") ctx.setLineDash([8, 6]);
@@ -1169,17 +1178,31 @@
           }
           ctx.stroke();
           ctx.restore();
-        } else {
+        } else if (offscreenStyle === "arrows" && !onScreen) {
           const headLength = arrowSize;
           const headAngle = Math.PI / 6;
           const a1 = angle - headAngle;
           const a2 = angle + headAngle;
           ctx.save();
           ctx.beginPath();
-          ctx.moveTo(endX, endY);
-          ctx.lineTo(endX - Math.cos(a1) * headLength, endY - Math.sin(a1) * headLength);
-          ctx.moveTo(endX, endY);
-          ctx.lineTo(endX - Math.cos(a2) * headLength, endY - Math.sin(a2) * headLength);
+          if (arrowStyle === "dot") {
+            ctx.arc(endX, endY, Math.max(4, headLength * 0.35), 0, Math.PI * 2);
+            ctx.fillStyle = arrowColor;
+          } else if (arrowStyle === "modern") {
+            const tailX = endX - Math.cos(angle) * headLength;
+            const tailY = endY - Math.sin(angle) * headLength;
+            const perpX = Math.cos(angle + Math.PI / 2) * (headLength * 0.45);
+            const perpY = Math.sin(angle + Math.PI / 2) * (headLength * 0.45);
+            ctx.moveTo(endX, endY);
+            ctx.quadraticCurveTo(tailX + perpX, tailY + perpY, tailX, tailY);
+            ctx.quadraticCurveTo(tailX - perpX, tailY - perpY, endX, endY);
+            ctx.fillStyle = arrowColor;
+          } else {
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - Math.cos(a1) * headLength, endY - Math.sin(a1) * headLength);
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - Math.cos(a2) * headLength, endY - Math.sin(a2) * headLength);
+          }
           ctx.lineWidth = tracerWidth;
           ctx.strokeStyle = arrowColor;
           if (offscreenTheme === "dashed") ctx.setLineDash([6, 5]);
@@ -1187,7 +1210,8 @@
             ctx.shadowColor = arrowColor;
             ctx.shadowBlur = 10;
           }
-          ctx.stroke();
+          if (arrowStyle === "dot" || arrowStyle === "modern") ctx.fill();
+          else ctx.stroke();
           ctx.restore();
         }
       }
@@ -1312,10 +1336,22 @@
                     { value: "neon", label: "Neon" },
                   ],
                 },
+                { id: "alwaysTracer", label: "Always Show Tracer", type: "checkbox", default: false },
                 { id: "tracerWidth", label: "Tracer Width", type: "slider", min: 1, max: 8, step: 1, default: 3, unit: "px" },
                 { id: "tracerColor", label: "Tracer Color", type: "color", default: "#ff3b3b" },
                 { id: "arrowSize", label: "Arrow Size", type: "slider", min: 8, max: 30, step: 1, default: 14, unit: "px" },
                 { id: "arrowColor", label: "Arrow Color", type: "color", default: "#ff3b3b" },
+                {
+                  id: "arrowStyle",
+                  label: "Arrow Style",
+                  type: "select",
+                  default: "regular",
+                  options: [
+                    { value: "regular", label: "Regular Arrow" },
+                    { value: "dot", label: "Dot" },
+                    { value: "modern", label: "Modern Arrow" },
+                  ],
+                },
               ],
             },
             "HUD",
@@ -1844,11 +1880,22 @@
     .zyrox-setting-card input[type='range'] { width: 190px; accent-color: var(--zyx-slider-color); }
     .zyrox-setting-card input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--zyx-checkmark-color); }
     .zyrox-setting-card select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
       border: 1px solid var(--zyx-settings-card-border);
       background: color-mix(in srgb, var(--zyx-settings-sidebar-bg) 55%, transparent);
+      background-image:
+        linear-gradient(45deg, transparent 50%, var(--zyx-settings-text) 50%),
+        linear-gradient(135deg, var(--zyx-settings-text) 50%, transparent 50%);
+      background-position:
+        calc(100% - 14px) calc(50% - 2px),
+        calc(100% - 8px) calc(50% - 2px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
       color: var(--zyx-settings-text);
       border-radius: 8px;
-      padding: 6px 8px;
+      padding: 6px 26px 6px 8px;
       font-size: 12px;
       min-height: 30px;
     }
@@ -2446,6 +2493,10 @@
               <option value="arrows" ${cfg.offscreenStyle === "arrows" ? "selected" : ""}>Arrows</option>
             </select>
           </label>
+          <label style="display:flex;align-items:center;gap:6px;">
+            <input type="checkbox" class="esp-always-tracer" ${cfg.alwaysTracer ? "checked" : ""} />
+            Always Show Tracer
+          </label>
           <label>Theme
             <select class="esp-offscreen-theme">
               <option value="classic" ${cfg.offscreenTheme === "classic" ? "selected" : ""}>Classic</option>
@@ -2462,6 +2513,13 @@
             <label>Arrow Size <input type="range" class="esp-arrow-size" min="8" max="30" step="1" value="${cfg.arrowSize}" /></label>
             <span class="esp-arrow-size-value">${cfg.arrowSize}px</span>
             <input type="color" class="esp-arrow-color" value="${cfg.arrowColor}" />
+            <label>Arrow Style
+              <select class="esp-arrow-style">
+                <option value="regular" ${cfg.arrowStyle === "regular" ? "selected" : ""}>Regular Arrow</option>
+                <option value="dot" ${cfg.arrowStyle === "dot" ? "selected" : ""}>Dot</option>
+                <option value="modern" ${cfg.arrowStyle === "modern" ? "selected" : ""}>Modern Arrow</option>
+              </select>
+            </label>
           </span>
         </div>
       `);
@@ -2510,6 +2568,7 @@
       const styleInput = offscreenRow.querySelector(".esp-offscreen-style");
       const tracerControls = offscreenRow.querySelector(".esp-tracer-controls");
       const arrowControls = offscreenRow.querySelector(".esp-arrow-controls");
+      const alwaysTracerInput = offscreenRow.querySelector(".esp-always-tracer");
       const refreshIndicatorModeVisibility = () => {
         const mode = cfg.offscreenStyle === "arrows" || cfg.offscreenStyle === "none" ? cfg.offscreenStyle : "tracers";
         if (tracerControls) tracerControls.style.display = mode === "tracers" ? "flex" : "none";
@@ -2529,10 +2588,23 @@
           syncEsp();
         });
       }
+      if (alwaysTracerInput) {
+        alwaysTracerInput.addEventListener("change", (event) => {
+          cfg.alwaysTracer = Boolean(event.target.checked);
+          syncEsp();
+        });
+      }
       bindSlider(offscreenRow, ".esp-tracer-width", "tracerWidth", ".esp-tracer-width-value");
       bindColor(offscreenRow, ".esp-tracer-color", "tracerColor");
       bindSlider(offscreenRow, ".esp-arrow-size", "arrowSize", ".esp-arrow-size-value");
       bindColor(offscreenRow, ".esp-arrow-color", "arrowColor");
+      const arrowStyleInput = offscreenRow.querySelector(".esp-arrow-style");
+      if (arrowStyleInput) {
+        arrowStyleInput.addEventListener("change", (event) => {
+          cfg.arrowStyle = String(event.target.value || "regular");
+          syncEsp();
+        });
+      }
       refreshIndicatorModeVisibility();
     } else if (moduleLayout && Array.isArray(moduleLayout.settings)) {
       for (const setting of moduleLayout.settings) {
