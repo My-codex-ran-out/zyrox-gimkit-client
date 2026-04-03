@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.0.9
+// @version      1.1.0
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.0.9";
+    const CLIENT_VERSION = "1.1.0";
     return CLIENT_VERSION;
   }
 
@@ -1258,7 +1258,7 @@
 
       if (!showNames) continue;
       ctx.fillStyle = nameColor;
-      ctx.font = `${nameSize}px Verdana`;
+      ctx.font = `${nameSize}px Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       const labelX = onScreen ? screenX : Math.cos(angle) * Math.min(250, distance) + canvas.width / 2;
@@ -1488,6 +1488,8 @@
       --zyx-settings-subtext: #c2c2ce;
       --zyx-settings-card-bg: rgba(255,255,255,.03);
       --zyx-settings-card-border: rgba(255,255,255,.08);
+      --zyx-select-bg: rgba(20, 20, 28, 0.9);
+      --zyx-select-text: #ffe5e5;
       --zyx-accent-soft: #ffbdbd;
       --zyx-search-text: #ffe6e6;
       --zyx-checkmark-color: #ff6b6b;
@@ -1925,16 +1927,16 @@
       -webkit-appearance: none;
       -moz-appearance: none;
       border: 1px solid var(--zyx-settings-card-border);
-      background: color-mix(in srgb, var(--zyx-settings-sidebar-bg) 55%, transparent);
+      background: var(--zyx-select-bg);
       background-image:
-        linear-gradient(45deg, transparent 50%, var(--zyx-settings-text) 50%),
-        linear-gradient(135deg, var(--zyx-settings-text) 50%, transparent 50%);
+        linear-gradient(45deg, transparent 50%, var(--zyx-select-text) 50%),
+        linear-gradient(135deg, var(--zyx-select-text) 50%, transparent 50%);
       background-position:
         calc(100% - 14px) calc(50% - 2px),
         calc(100% - 8px) calc(50% - 2px);
       background-size: 6px 6px, 6px 6px;
       background-repeat: no-repeat;
-      color: var(--zyx-settings-text);
+      color: var(--zyx-select-text);
       border-radius: 8px;
       padding: 6px 26px 6px 8px;
       font-size: 12px;
@@ -1945,12 +1947,14 @@
       outline-offset: 1px;
     }
     .zyrox-setting-card select option {
-      background: #17171f;
-      color: var(--zyx-settings-text);
+      background: var(--zyx-select-bg);
+      color: var(--zyx-select-text);
     }
     .zyrox-gradient-pair { display: inline-flex; align-items: center; gap: 8px; }
+    .zyrox-preset-header { font-size: 11px; text-transform: uppercase; letter-spacing: .35px; color: var(--zyx-accent-soft); margin-bottom: 4px; }
     .zyrox-preset-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
     .zyrox-preset-btn { border: 1px solid var(--zyx-outline-color); background: rgba(0,0,0,.26); color: var(--zyx-settings-text); border-radius: 8px; padding: 6px 10px; font-size: 11px; cursor: pointer; }
+    .zyrox-preset-btn .preset-swatch { display:inline-block; width:10px; height:10px; border-radius:999px; margin-right:6px; border:1px solid rgba(255,255,255,.3); vertical-align:-1px; }
     .zyrox-preset-btn:hover { background: var(--zyx-btn-hover-bg); }
     .zyrox-subheading {
       grid-column: 1 / -1;
@@ -2108,11 +2112,12 @@
       </div>
       <div class="zyrox-settings-pane hidden" data-pane="theme">
         <div class="zyrox-settings-body">
+          <div class="zyrox-preset-header">Presets</div>
           <div class="zyrox-preset-row">
-            <button type="button" class="zyrox-preset-btn" data-preset="default">Default</button>
-            <button type="button" class="zyrox-preset-btn" data-preset="green">Green</button>
-            <button type="button" class="zyrox-preset-btn" data-preset="ice">Ice</button>
-            <button type="button" class="zyrox-preset-btn" data-preset="grayscale">Greyscale</button>
+            <button type="button" class="zyrox-preset-btn" data-preset="default"><span class="preset-swatch" style="background:#ff3d3d"></span>Default</button>
+            <button type="button" class="zyrox-preset-btn" data-preset="green"><span class="preset-swatch" style="background:#2dff75"></span>Green</button>
+            <button type="button" class="zyrox-preset-btn" data-preset="ice"><span class="preset-swatch" style="background:#6cd8ff"></span>Ice</button>
+            <button type="button" class="zyrox-preset-btn" data-preset="grayscale"><span class="preset-swatch" style="background:#bfbfbf"></span>Greyscale</button>
           </div>
           <div class="zyrox-subheading">Main Window</div>
           <div class="zyrox-setting-card">
@@ -2154,6 +2159,14 @@
           <div class="zyrox-setting-card">
             <label>Checkmark Color</label>
             <input type="color" class="set-checkmark-color" value="#ff6b6b" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Dropdown Background</label>
+            <input type="color" class="set-select-bg" value="#17171f" />
+          </div>
+          <div class="zyrox-setting-card">
+            <label>Dropdown Text</label>
+            <input type="color" class="set-select-text" value="#ffe5e5" />
           </div>
           <div class="zyrox-subheading">Typography</div>
           <div class="zyrox-setting-card">
@@ -2323,6 +2336,8 @@
   const opacityInput = settingsMenu.querySelector(".set-opacity");
   const sliderColorInput = settingsMenu.querySelector(".set-slider-color");
   const checkmarkColorInput = settingsMenu.querySelector(".set-checkmark-color");
+  const selectBgInput = settingsMenu.querySelector(".set-select-bg");
+  const selectTextInput = settingsMenu.querySelector(".set-select-text");
   const mutedTextInput = settingsMenu.querySelector(".set-muted-text");
   const accentSoftInput = settingsMenu.querySelector(".set-accent-soft");
   const searchTextInput = settingsMenu.querySelector(".set-search-text");
@@ -2786,6 +2801,8 @@
       opacity: opacityInput.value,
       sliderColor: sliderColorInput.value,
       checkmarkColor: checkmarkColorInput.value,
+      selectBg: selectBgInput.value,
+      selectText: selectTextInput.value,
       mutedText: mutedTextInput.value,
       accentSoft: accentSoftInput.value,
       searchText: searchTextInput.value,
@@ -2918,6 +2935,7 @@
           accent: "#2dff75", shellStart: "#2dff75", shellEnd: "#03130a", topbar: "#35d96d", border: "#5dff9a",
           outline: "#37d878", text: "#d7ffe6", muted: "#88b79b", soft: "#a8ffd0", search: "#e6fff0", icon: "#d7ffe9",
           panelText: "#d9ffe8", panelBorder: "#5fff99", panelBg: "#04110a", slider: "#2dff75", checkmark: "#2dff75",
+          selectBg: "#111e16", selectText: "#d7ffe6",
           headerStart: "#2dff75", headerEnd: "#0f2f1b", headerText: "#f0fff4",
           settingsHeaderStart: "#2dff75", settingsHeaderEnd: "#0f2f1b", espValueTextColor: "#ffffff",
         };
@@ -2927,6 +2945,7 @@
           accent: "#6cd8ff", shellStart: "#6cd8ff", shellEnd: "#07131a", topbar: "#58bff1", border: "#8ae4ff",
           outline: "#6fbce8", text: "#d7edff", muted: "#8ea7bd", soft: "#b8e5ff", search: "#e7f5ff", icon: "#dff3ff",
           panelText: "#e1f4ff", panelBorder: "#8fd7ff", panelBg: "#071019", slider: "#7bdfff", checkmark: "#7bdfff",
+          selectBg: "#0c1c26", selectText: "#d7edff",
           headerStart: "#6cd8ff", headerEnd: "#133042", headerText: "#f4fbff",
           settingsHeaderStart: "#6cd8ff", settingsHeaderEnd: "#133042", espValueTextColor: "#ffffff",
         };
@@ -2936,6 +2955,7 @@
           accent: "#d3d3d3", shellStart: "#7a7a7a", shellEnd: "#0a0a0a", topbar: "#8d8d8d", border: "#b1b1b1",
           outline: "#9a9a9a", text: "#dddddd", muted: "#9a9a9a", soft: "#c9c9c9", search: "#f1f1f1", icon: "#f5f5f5",
           panelText: "#efefef", panelBorder: "#a0a0a0", panelBg: "#0f0f0f", slider: "#c4c4c4", checkmark: "#d0d0d0",
+          selectBg: "#1b1b1b", selectText: "#efefef",
           headerStart: "#8f8f8f", headerEnd: "#1d1d1d", headerText: "#ffffff",
           settingsHeaderStart: "#8f8f8f", settingsHeaderEnd: "#1d1d1d", espValueTextColor: "#ffffff",
         };
@@ -2945,6 +2965,7 @@
         accent: "#ff3d3d", shellStart: "#ff3d3d", shellEnd: "#000000", topbar: "#ff4a4a", border: "#ff6f6f",
         outline: "#ff5b5b", text: "#d6d6df", muted: "#9b9bab", soft: "#ffbdbd", search: "#ffe6e6", icon: "#ffdada",
         panelText: "#ffd9d9", panelBorder: "#ff6464", panelBg: "#08080a", slider: "#ff6b6b", checkmark: "#ff6b6b",
+        selectBg: "#17171f", selectText: "#ffe5e5",
         headerStart: "#ff4a4a", headerEnd: "#3c1212", headerText: "#ffffff",
         settingsHeaderStart: "#ff3d3d", settingsHeaderEnd: "#2d0c0c", espValueTextColor: "#ffffff",
       };
@@ -2966,6 +2987,8 @@
     panelCountBgInput.value = preset.panelBg;
     sliderColorInput.value = preset.slider;
     checkmarkColorInput.value = preset.checkmark;
+    selectBgInput.value = preset.selectBg;
+    selectTextInput.value = preset.selectText;
     headerStartInput.value = preset.headerStart;
     headerEndInput.value = preset.headerEnd;
     headerTextInput.value = preset.headerText;
@@ -3004,6 +3027,8 @@
     const opacity = Number(opacityInput.value) / 100;
     const sliderColor = sliderColorInput.value;
     const checkmarkColor = checkmarkColorInput.value;
+    const selectBg = selectBgInput.value;
+    const selectText = selectTextInput.value;
     const mutedText = mutedTextInput.value;
     const accentSoft = accentSoftInput.value;
     const searchText = searchTextInput.value;
@@ -3054,6 +3079,8 @@
     cssRoot.setProperty("--zyx-settings-card-bg", toRgba(settingsCardBg, 0.05));
     cssRoot.setProperty("--zyx-slider-color", sliderColor);
     cssRoot.setProperty("--zyx-checkmark-color", checkmarkColor);
+    cssRoot.setProperty("--zyx-select-bg", toRgba(selectBg, 0.9));
+    cssRoot.setProperty("--zyx-select-text", selectText);
     window.__zyroxEspValueTextColor = espValueTextColor;
     window.__zyroxEspConfig = { ...getEspRenderConfig(), valueTextColor: espValueTextColor };
     cssRoot.setProperty("--zyx-radius-xl", `${radius}px`);
@@ -3235,6 +3262,8 @@
   settingsSubtextInput.addEventListener("input", applyAppearance);
   settingsCardBorderInput.addEventListener("input", applyAppearance);
   settingsCardBgInput.addEventListener("input", applyAppearance);
+  selectBgInput.addEventListener("input", applyAppearance);
+  selectTextInput.addEventListener("input", applyAppearance);
   espValueTextColorInput.addEventListener("input", applyAppearance);
   scaleInput.addEventListener("input", applyAppearance);
   radiusInput.addEventListener("input", applyAppearance);
@@ -3262,6 +3291,8 @@
     opacityInput.value = "45";
     sliderColorInput.value = "#ff6b6b";
     checkmarkColorInput.value = "#ff6b6b";
+    selectBgInput.value = "#17171f";
+    selectTextInput.value = "#ffe5e5";
     mutedTextInput.value = "#9b9bab";
     accentSoftInput.value = "#ffbdbd";
     searchTextInput.value = "#ffe6e6";
@@ -3323,6 +3354,8 @@
     cssRoot.removeProperty("--zyx-settings-card-bg");
     cssRoot.removeProperty("--zyx-slider-color");
     cssRoot.removeProperty("--zyx-checkmark-color");
+    cssRoot.removeProperty("--zyx-select-bg");
+    cssRoot.removeProperty("--zyx-select-text");
     cssRoot.removeProperty("--zyx-radius-xl");
     cssRoot.removeProperty("--zyx-radius-lg");
     cssRoot.removeProperty("--zyx-radius-md");
@@ -3422,6 +3455,8 @@
         assign(opacityInput, "opacity");
         assign(sliderColorInput, "sliderColor");
         assign(checkmarkColorInput, "checkmarkColor");
+        assign(selectBgInput, "selectBg");
+        assign(selectTextInput, "selectText");
         assign(mutedTextInput, "mutedText");
         assign(accentSoftInput, "accentSoft");
         assign(searchTextInput, "searchText");
