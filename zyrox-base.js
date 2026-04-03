@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      0.9.8
+// @version      0.9.6
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
-// @run-at       document-idle
+// @run-at       document-start
 // @updateURL    https://raw.githubusercontent.com/Bob-alt-828100/zyrox-gimkit-client/refs/heads/main/zyrox-base.js
 // @downloadURL  https://raw.githubusercontent.com/Bob-alt-828100/zyrox-gimkit-client/refs/heads/main/zyrox-base.js
 // @icon         https://raw.githubusercontent.com/Bob-alt-828100/zyrox-gimkit-client/refs/heads/main/images/logo.png
@@ -43,9 +43,277 @@
   if (window.__ZYROX_UI_MOUNTED__) return;
   window.__ZYROX_UI_MOUNTED__ = true;
 
+  // ---------------------------------------------------------------------------
+  // AUTO-ANSWER PAGE-CONTEXT INJECTION
+  // Injected as a real <script> tag so it runs in page scope and patches
+  // window.WebSocket BEFORE Gimkit creates its connection.
+  // Mirrors autoanswer.js 1:1, but exposes window.__zyroxAutoAnswer.start/stop
+  // so the Zyrox module toggle controls it.
+  // ---------------------------------------------------------------------------
+  (function injectAutoAnswerPageContext() {
+    function pageMain() {
+      const LOG = "[AutoAnswer][page]";
+      const colyseusProtocol = { ROOM_DATA: 13 };
+
+      function msgpackEncode(value) {
+        const bytes = [];
+        const deferred = [];
+        const write = (input) => {
+          const type = typeof input;
+          if (type === "string") {
+            let len = 0;
+            for (let i = 0; i < input.length; i++) {
+              const code = input.charCodeAt(i);
+              if (code < 128) len++; else if (code < 2048) len += 2; else if (code < 55296 || code > 57343) len += 3; else { i++; len += 4; }
+            }
+            if (len < 32) bytes.push(160 | len); else if (len < 256) bytes.push(217, len); else bytes.push(218, len >> 8, len & 255);
+            deferred.push({ type: "string", value: input, offset: bytes.length });
+            bytes.length += len;
+            return;
+          }
+          if (type === "number") {
+            if (Number.isInteger(input) && input >= 0 && input < 128) { bytes.push(input); return; }
+            if (Number.isInteger(input) && input >= 0 && input < 65536) { bytes.push(205, input >> 8, input & 255); return; }
+            bytes.push(203); deferred.push({ type: "float64", value: input, offset: bytes.length }); bytes.length += 8; return;
+          }
+          if (type === "boolean") { bytes.push(input ? 195 : 194); return; }
+          if (input == null) { bytes.push(192); return; }
+          if (Array.isArray(input)) {
+            const len = input.length;
+            if (len < 16) bytes.push(144 | len); else bytes.push(220, len >> 8, len & 255);
+            for (const item of input) write(item);
+            return;
+          }
+          const keys = Object.keys(input);
+          const len = keys.length;
+          if (len < 16) bytes.push(128 | len); else bytes.push(222, len >> 8, len & 255);
+          for (const key of keys) { write(key); write(input[key]); }
+        };
+        write(value);
+        const view = new DataView(new ArrayBuffer(bytes.length));
+        for (let i = 0; i < bytes.length; i++) view.setUint8(i, bytes[i] & 255);
+        for (const part of deferred) {
+          if (part.type === "float64") { view.setFloat64(part.offset, part.value); continue; }
+          let offset = part.offset;
+          const s = part.value;
+          for (let i = 0; i < s.length; i++) {
+            let code = s.charCodeAt(i);
+            if (code < 128) view.setUint8(offset++, code);
+            else if (code < 2048) { view.setUint8(offset++, 192 | (code >> 6)); view.setUint8(offset++, 128 | (code & 63)); }
+            else { view.setUint8(offset++, 224 | (code >> 12)); view.setUint8(offset++, 128 | ((code >> 6) & 63)); view.setUint8(offset++, 128 | (code & 63)); }
+          }
+        }
+        return view.buffer;
+      }
+
+      function msgpackDecode(buffer, startOffset = 0) {
+        const view = new DataView(buffer);
+        let offset = startOffset;
+        const readString = (len) => {
+          let out = "";
+          const end = offset + len;
+          while (offset < end) {
+            const byte = view.getUint8(offset++);
+            if ((byte & 0x80) === 0) out += String.fromCharCode(byte);
+            else if ((byte & 0xe0) === 0xc0) out += String.fromCharCode(((byte & 0x1f) << 6) | (view.getUint8(offset++) & 0x3f));
+            else out += String.fromCharCode(((byte & 0x0f) << 12) | ((view.getUint8(offset++) & 0x3f) << 6) | (view.getUint8(offset++) & 0x3f));
+          }
+          return out;
+        };
+        const read = () => {
+          const token = view.getUint8(offset++);
+          if (token < 0x80) return token;
+          if (token < 0x90) { const size = token & 0x0f; const map = {}; for (let i = 0; i < size; i++) map[read()] = read(); return map; }
+          if (token < 0xa0) { const size = token & 0x0f; const arr = new Array(size); for (let i = 0; i < size; i++) arr[i] = read(); return arr; }
+          if (token < 0xc0) return readString(token & 0x1f);
+          if (token > 0xdf) return token - 256;
+          switch (token) {
+            case 192: return null;
+            case 194: return false;
+            case 195: return true;
+            case 202: { const n = view.getFloat32(offset); offset += 4; return n; }
+            case 203: { const n = view.getFloat64(offset); offset += 8; return n; }
+            case 204: { const n = view.getUint8(offset); offset += 1; return n; }
+            case 205: { const n = view.getUint16(offset); offset += 2; return n; }
+            case 206: { const n = view.getUint32(offset); offset += 4; return n; }
+            case 208: { const n = view.getInt8(offset); offset += 1; return n; }
+            case 209: { const n = view.getInt16(offset); offset += 2; return n; }
+            case 210: { const n = view.getInt32(offset); offset += 4; return n; }
+            case 217: { const n = view.getUint8(offset); offset += 1; return readString(n); }
+            case 218: { const n = view.getUint16(offset); offset += 2; return readString(n); }
+            case 220: { const size = view.getUint16(offset); offset += 2; const arr = new Array(size); for (let i = 0; i < size; i++) arr[i] = read(); return arr; }
+            case 222: { const size = view.getUint16(offset); offset += 2; const map = {}; for (let i = 0; i < size; i++) map[read()] = read(); return map; }
+            default: return null;
+          }
+        };
+        const value = read();
+        return { value, offset };
+      }
+
+      function parseChangePacket(packet) {
+        const out = [];
+        for (const change of packet?.changes || []) {
+          const data = {};
+          const keys = change[1].map((index) => packet.values[index]);
+          for (let i = 0; i < keys.length; i++) data[keys[i]] = change[2][i];
+          out.push({ id: change[0], data });
+        }
+        return out;
+      }
+
+      class LocalSocketManager extends EventTarget {
+        constructor() {
+          super();
+          this.socket = null;
+          this.transportType = "unknown";
+          this.playerId = null;
+          this.install();
+        }
+        install() {
+          const manager = this;
+          const NativeWebSocket = window.WebSocket;
+          window.WebSocket = class extends NativeWebSocket {
+            constructor(url, protocols) {
+              super(url, protocols);
+              if (String(url || "").includes("gimkitconnect.com")) manager.registerSocket(this);
+            }
+            send(data) {
+              super.send(data);
+            }
+          };
+        }
+        registerSocket(socket) {
+          this.socket = socket;
+          this.transportType = "colyseus";
+          console.log(LOG, "Registered WebSocket", socket.url);
+          socket.addEventListener("message", (e) => {
+            const decoded = this.decodeColyseus(e.data);
+            if (!decoded) return;
+            this.dispatchEvent(new CustomEvent("colyseusMessage", { detail: decoded }));
+            if (decoded.type === "AUTH_ID") {
+              this.playerId = decoded.message;
+              console.log(LOG, "Got player id", this.playerId);
+            }
+            if (decoded.type === "DEVICES_STATES_CHANGES") {
+              const parsed = parseChangePacket(decoded.message);
+              this.dispatchEvent(new CustomEvent("deviceChanges", { detail: parsed }));
+            }
+          });
+        }
+        decodeColyseus(data) {
+          const bytes = new Uint8Array(data);
+          if (bytes[0] !== colyseusProtocol.ROOM_DATA) return null;
+          const first = msgpackDecode(data, 1);
+          if (!first) return null;
+          let message;
+          if (bytes.byteLength > first.offset) {
+            const second = msgpackDecode(data, first.offset);
+            message = second?.value;
+          }
+          return { type: first.value, message };
+        }
+        sendMessage(channel, payload) {
+          if (!this.socket) return;
+          const header = new Uint8Array([colyseusProtocol.ROOM_DATA]);
+          const a = new Uint8Array(msgpackEncode(channel));
+          const b = new Uint8Array(msgpackEncode(payload));
+          const packet = new Uint8Array(header.length + a.length + b.length);
+          packet.set(header, 0);
+          packet.set(a, header.length);
+          packet.set(b, header.length + a.length);
+          this.socket.send(packet);
+        }
+      }
+
+      const socketManager = window.socketManager || new LocalSocketManager();
+      window.socketManager = socketManager;
+
+      const state = {
+        questions: [],
+        answerDeviceId: null,
+        currentQuestionId: null,
+        questionIdList: [],
+        currentQuestionIndex: -1,
+      };
+
+      function answerQuestion() {
+        if (socketManager.transportType === "colyseus") {
+          if (state.currentQuestionId == null || state.answerDeviceId == null) return;
+          const question = state.questions.find((q) => q._id == state.currentQuestionId);
+          if (!question) return;
+          const packet = { key: "answered", deviceId: state.answerDeviceId, data: {} };
+          if (question.type == "text") packet.data.answer = question.answers[0].text;
+          else packet.data.answer = question.answers.find((a) => a.correct)?._id;
+          if (!packet.data.answer) return;
+          socketManager.sendMessage("MESSAGE_FOR_DEVICE", packet);
+          console.log(LOG, "Answered colyseus", state.currentQuestionId);
+        } else {
+          const questionId = state.questionIdList[state.currentQuestionIndex];
+          const question = state.questions.find((q) => q._id == questionId);
+          if (!question) return;
+          const answer = question.type == "mc" ? question.answers.find((a) => a.correct)?._id : question.answers[0]?.text;
+          if (!answer) return;
+          socketManager.sendMessage("QUESTION_ANSWERED", { answer, questionId });
+          console.log(LOG, "Answered blueboat", questionId);
+        }
+      }
+
+      socketManager.addEventListener("deviceChanges", (event) => {
+        for (const { id, data } of event.detail || []) {
+          for (const key in data || {}) {
+            if (key === "GLOBAL_questions") {
+              state.questions = JSON.parse(data[key]);
+              state.answerDeviceId = id;
+              console.log(LOG, "Got questions", state.questions.length);
+            }
+            if (socketManager.playerId && key === `PLAYER_${socketManager.playerId}_currentQuestionId`) {
+              state.currentQuestionId = data[key];
+            }
+          }
+        }
+      });
+
+      socketManager.addEventListener("blueboatMessage", (event) => {
+        if (event.detail?.key !== "STATE_UPDATE") return;
+        switch (event.detail.data.type) {
+          case "GAME_QUESTIONS":
+            state.questions = event.detail.data.value;
+            break;
+          case "PLAYER_QUESTION_LIST":
+            state.questionIdList = event.detail.data.value.questionList;
+            state.currentQuestionIndex = event.detail.data.value.questionIndex;
+            break;
+          case "PLAYER_QUESTION_LIST_INDEX":
+            state.currentQuestionIndex = event.detail.data.value;
+            break;
+        }
+      });
+
+      // Expose start/stop so the Zyrox module toggle controls the interval
+      let _intervalId = null;
+      window.__zyroxAutoAnswer = {
+        start(speed = 1000) {
+          if (_intervalId) clearInterval(_intervalId);
+          _intervalId = setInterval(answerQuestion, speed);
+          console.log(LOG, "Started auto-answer", speed + "ms");
+        },
+        stop() {
+          if (_intervalId) { clearInterval(_intervalId); _intervalId = null; }
+          console.log(LOG, "Stopped auto-answer");
+        },
+      };
+      console.log(LOG, "Page context ready, waiting for module toggle.");
+    }
+
+    const el = document.createElement("script");
+    el.textContent = `;(${pageMain.toString()})();`;
+    (document.head || document.documentElement).appendChild(el);
+    el.remove();
+  })();
+
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "0.9.8";
+    const CLIENT_VERSION = "0.9.6";
     return CLIENT_VERSION;
   }
 
@@ -635,7 +903,7 @@
             {
               name: "Auto Answer",
               settings: [
-                { id: "speed", label: "Answer Delay (ms)", type: "slider", min: 100, max: 3000, step: 50, default: 1000 },
+                { id: "speed", label: "Answer Delay", type: "slider", min: 200, max: 3000, step: 50, default: 1000 },
               ],
             },
             "Answer Streak",
@@ -707,6 +975,9 @@
 
   // Bumped to v3 — includes display-mode and loose layout position persistence
   const STORAGE_KEY = "zyrox_client_settings_v3";
+
+  // Defer all DOM work — WebSocket is already patched above at document-start.
+  document.addEventListener("DOMContentLoaded", () => {
 
   const style = document.createElement("style");
   style.textContent = `
@@ -1629,549 +1900,26 @@
       moduleInstance.disable();
       item.classList.remove("active");
       if (moduleName === "Auto Answer") stopAutoAnswer();
-      if (moduleName === "ESP") stopESP();
     } else {
       moduleInstance.enable();
       item.classList.add("active");
       if (moduleName === "Auto Answer") startAutoAnswer();
-      if (moduleName === "ESP") startESP();
     }
   }
 
-  const zyroxEspState = globalThis.__ZYROX_ESP_STATE__ || {
-    intervalId: null,
-    canvas: null,
-    ctx: null,
-    lastSerializer: null,
-    lastSerializerSource: null,
-    highlightTeammates: true,
-    highlightEnemies: true,
-    lastPlayerId: null,
-    knownCharacterIds: new Set(),
-    lastDebugAt: 0,
-    debugEveryMs: 1500,
-  };
-  globalThis.__ZYROX_ESP_STATE__ = zyroxEspState;
-
-  function espLog(message, payload) {
-    if (payload !== undefined) console.log(`[Zyrox][ESP] ${message}`, payload);
-    else console.log(`[Zyrox][ESP] ${message}`);
-  }
-
-  function ensureEspCanvas() {
-    if (zyroxEspState.canvas && document.body.contains(zyroxEspState.canvas)) return zyroxEspState.canvas;
-    const canvas = document.createElement("canvas");
-    canvas.style.position = "fixed";
-    canvas.style.left = "0";
-    canvas.style.top = "0";
-    canvas.style.width = "100vw";
-    canvas.style.height = "100vh";
-    canvas.style.pointerEvents = "none";
-    canvas.style.zIndex = "2147483646";
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    document.body.appendChild(canvas);
-    zyroxEspState.canvas = canvas;
-    zyroxEspState.ctx = canvas.getContext("2d");
-    espLog("Canvas created and mounted.");
-    return canvas;
-  }
-
-  function resizeEspCanvas() {
-    const canvas = zyroxEspState.canvas;
-    if (!canvas) return;
-    if (canvas.width === window.innerWidth && canvas.height === window.innerHeight) return;
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    espLog("Canvas resized.", { width: canvas.width, height: canvas.height });
-  }
-
-  function tryGetSerializerCandidate(candidate) {
-    if (!candidate || typeof candidate !== "object") return null;
-    const mapLike = candidate?.state?.characters?.$items;
-    if (!mapLike) return null;
-    if (typeof mapLike.get === "function" && typeof mapLike[Symbol.iterator] === "function") return candidate;
-    return null;
-  }
-
-  function findSerializer() {
-    const directCandidates = [
-      ["window.serializer", globalThis.serializer],
-      ["window.socketManager.serializer", globalThis.socketManager?.serializer],
-      ["window.stores.network.serializer", globalThis.stores?.network?.serializer],
-      ["window.stores.colyseus.serializer", globalThis.stores?.colyseus?.serializer],
-    ];
-
-    for (const [label, candidate] of directCandidates) {
-      const valid = tryGetSerializerCandidate(candidate);
-      if (valid) {
-        if (zyroxEspState.lastSerializer !== valid) {
-          zyroxEspState.lastSerializer = valid;
-          zyroxEspState.lastSerializerSource = label;
-          espLog(`Serializer discovered from ${label}.`);
-        }
-        return valid;
-      }
-    }
-
-    for (const key of Object.getOwnPropertyNames(globalThis)) {
-      let candidate;
-      try {
-        candidate = globalThis[key];
-      } catch (_) {
-        continue;
-      }
-      const valid = tryGetSerializerCandidate(candidate);
-      if (valid) {
-        zyroxEspState.lastSerializer = valid;
-        zyroxEspState.lastSerializerSource = `window.${key}`;
-        espLog(`Serializer discovered by global scan at window.${key}.`);
-        return valid;
-      }
-    }
-
-    return null;
-  }
-
-  function drawEspFrame() {
-    resizeEspCanvas();
-    const canvas = zyroxEspState.canvas;
-    const ctx = zyroxEspState.ctx;
-    if (!canvas || !ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!zyroxEspState.highlightTeammates && !zyroxEspState.highlightEnemies) {
-      espLog("Both teammate and enemy highlighting are disabled, skipping frame.");
-      return;
-    }
-
-    const serializer = findSerializer();
-    if (!serializer) {
-      if (Date.now() - zyroxEspState.lastDebugAt > zyroxEspState.debugEveryMs) {
-        espLog("No serializer found yet, waiting...");
-        zyroxEspState.lastDebugAt = Date.now();
-      }
-      return;
-    }
-
-    const camera = globalThis.stores?.phaser?.scene?.cameras?.cameras?.[0];
-    if (!camera) {
-      if (Date.now() - zyroxEspState.lastDebugAt > zyroxEspState.debugEveryMs) {
-        espLog("Camera not available yet, waiting...");
-        zyroxEspState.lastDebugAt = Date.now();
-      }
-      return;
-    }
-
-    const playerId = globalThis.socketManager?.playerId;
-    if (!playerId) {
-      if (Date.now() - zyroxEspState.lastDebugAt > zyroxEspState.debugEveryMs) {
-        espLog("Player id not available yet, waiting...");
-        zyroxEspState.lastDebugAt = Date.now();
-      }
-      return;
-    }
-
-    if (zyroxEspState.lastPlayerId !== playerId) {
-      zyroxEspState.lastPlayerId = playerId;
-      espLog("Active player id updated.", { playerId });
-    }
-
-    const characters = serializer?.state?.characters?.$items;
-    if (!characters || typeof characters.get !== "function") {
-      espLog("Serializer characters map missing or invalid.");
-      return;
-    }
-
-    const localPlayer = characters.get(playerId);
-    if (!localPlayer) {
-      espLog("Local player character not found in serializer map.", { playerId });
-      return;
-    }
-
-    const camX = camera.midPoint?.x ?? 0;
-    const camY = camera.midPoint?.y ?? 0;
-    const seenThisFrame = new Set();
-    let drawn = 0;
-
-    for (const [id, character] of characters) {
-      if (!character || id === playerId) continue;
-      seenThisFrame.add(id);
-
-      const isTeammate = localPlayer.teamId === character.teamId;
-      if (isTeammate && !zyroxEspState.highlightTeammates) continue;
-      if (!isTeammate && !zyroxEspState.highlightEnemies) continue;
-
-      const angle = Math.atan2((character.y ?? 0) - camY, (character.x ?? 0) - camX);
-      const distance = Math.sqrt(Math.pow((character.x ?? 0) - camX, 2) + Math.pow((character.y ?? 0) - camY, 2)) * (camera.zoom ?? 1);
-      const arrowDist = Math.min(250, distance);
-      const arrowTipX = Math.cos(angle) * arrowDist + canvas.width / 2;
-      const arrowTipY = Math.sin(angle) * arrowDist + canvas.height / 2;
-      const leftAngle = angle + Math.PI / 4 * 3;
-      const rightAngle = angle - Math.PI / 4 * 3;
-
-      ctx.beginPath();
-      ctx.moveTo(arrowTipX, arrowTipY);
-      ctx.lineTo(arrowTipX + Math.cos(leftAngle) * 50, arrowTipY + Math.sin(leftAngle) * 50);
-      ctx.moveTo(arrowTipX, arrowTipY);
-      ctx.lineTo(arrowTipX + Math.cos(rightAngle) * 50, arrowTipY + Math.sin(rightAngle) * 50);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = isTeammate ? "green" : "red";
-      ctx.stroke();
-
-      ctx.fillStyle = "black";
-      ctx.font = "20px Verdana";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${character.name ?? "Unknown"} (${Math.floor(distance)})`, arrowTipX, arrowTipY);
-      drawn += 1;
-
-      espLog("Player found / rendered.", {
-        id,
-        name: character.name ?? "Unknown",
-        teammate: isTeammate,
-        distance: Math.floor(distance),
-        x: character.x ?? null,
-        y: character.y ?? null,
-      });
-    }
-
-    for (const existingId of zyroxEspState.knownCharacterIds) {
-      if (!seenThisFrame.has(existingId)) {
-        espLog("Player disappeared from render set.", { id: existingId });
-      }
-    }
-    zyroxEspState.knownCharacterIds = seenThisFrame;
-
-    espLog("ESP frame rendered.", {
-      totalCharacters: typeof characters.size === "number" ? characters.size : "unknown",
-      drawn,
-      serializerSource: zyroxEspState.lastSerializerSource,
-    });
-  }
-
-  function stopESP() {
-    if (zyroxEspState.intervalId) {
-      clearInterval(zyroxEspState.intervalId);
-      zyroxEspState.intervalId = null;
-      espLog("Render loop stopped.");
-    }
-    if (zyroxEspState.ctx && zyroxEspState.canvas) {
-      zyroxEspState.ctx.clearRect(0, 0, zyroxEspState.canvas.width, zyroxEspState.canvas.height);
-    }
-    if (zyroxEspState.canvas && zyroxEspState.canvas.parentNode) {
-      zyroxEspState.canvas.parentNode.removeChild(zyroxEspState.canvas);
-      espLog("Canvas removed.");
-    }
-    zyroxEspState.canvas = null;
-    zyroxEspState.ctx = null;
-    zyroxEspState.knownCharacterIds = new Set();
-  }
-
-  function startESP() {
-    stopESP();
-    ensureEspCanvas();
-    drawEspFrame();
-    zyroxEspState.intervalId = setInterval(drawEspFrame, 1000 / 10);
-    espLog("Render loop started at 10 FPS.");
-  }
-
-  var zyroxAutoAnswerState = globalThis.__ZYROX_AUTOANSWER_STATE__ || {
-    intervalId: null,
-    listenersAttached: false,
-    socketManager: null,
-    questions: [],
-    answerDeviceId: null,
-    currentQuestionId: null,
-    questionIdList: [],
-    currentQuestionIndex: -1,
-    lastAnsweredId: null,
-    playerId: null,
-    lastDebugAt: 0,
-  };
-  globalThis.__ZYROX_AUTOANSWER_STATE__ = zyroxAutoAnswerState;
-
-  function getSocketManager() {
-    if (zyroxAutoAnswerState.socketManager) return zyroxAutoAnswerState.socketManager;
-    const direct = globalThis.socketManager;
-    if (direct && direct.socket && typeof direct.sendMessage === "function" && typeof direct.addEventListener === "function") {
-      zyroxAutoAnswerState.socketManager = direct;
-      console.log("[Zyrox][AutoAnswer] Found socketManager on window.socketManager");
-      return direct;
-    }
-
-    for (const key of Object.getOwnPropertyNames(globalThis)) {
-      let candidate;
-      try {
-        candidate = globalThis[key];
-      } catch (_) {
-        continue;
-      }
-      if (candidate && candidate.socket && typeof candidate.sendMessage === "function" && typeof candidate.addEventListener === "function") {
-        zyroxAutoAnswerState.socketManager = candidate;
-        console.log(`[Zyrox][AutoAnswer] Found socket manager candidate on window.${key}`);
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  function getTransportType(socketManager) {
-    const raw = socketManager?.transportType;
-    if (typeof raw === "string") return raw;
-    if (raw && typeof raw.get === "function") {
-      try {
-        return raw.get();
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  function pickAnswerPayload(question) {
-    if (!question || !Array.isArray(question.answers) || question.answers.length === 0) return null;
-    if (question.type === "text") return question.answers[0]?.text ?? null;
-    return question.answers.find((a) => a && a.correct)?._id ?? null;
-  }
-
-  function normalizeText(value) {
-    return String(value || "").trim().toLowerCase();
-  }
-
-  function findQuestionBankInObject(root, depth = 0) {
-    if (!root || typeof root !== "object" || depth > 8) return null;
-    if (Array.isArray(root)) {
-      if (root.length && root.every((q) => q && typeof q === "object" && "_id" in q && Array.isArray(q.answers))) {
-        return root;
-      }
-      for (const item of root) {
-        const found = findQuestionBankInObject(item, depth + 1);
-        if (found) return found;
-      }
-      return null;
-    }
-    for (const value of Object.values(root)) {
-      const found = findQuestionBankInObject(value, depth + 1);
-      if (found) return found;
-    }
-    return null;
-  }
-
-  function refreshQuestionsFromStoresFallback() {
-    try {
-      const fromStores = findQuestionBankInObject(globalThis.stores);
-      if (fromStores && fromStores.length) {
-        zyroxAutoAnswerState.questions = fromStores;
-        if (Date.now() - zyroxAutoAnswerState.lastDebugAt > 5000) {
-          console.log(`[Zyrox][AutoAnswer] Loaded ${fromStores.length} questions from stores fallback.`);
-          zyroxAutoAnswerState.lastDebugAt = Date.now();
-        }
-      }
-    } catch (_) {}
-  }
-
-  function deepFindValueByKey(root, keyMatcher, depth = 0) {
-    if (!root || typeof root !== "object" || depth > 6) return null;
-    if (Array.isArray(root)) {
-      for (const item of root) {
-        const found = deepFindValueByKey(item, keyMatcher, depth + 1);
-        if (found !== null) return found;
-      }
-      return null;
-    }
-    for (const [key, value] of Object.entries(root)) {
-      if (keyMatcher(key, value)) return value;
-      const found = deepFindValueByKey(value, keyMatcher, depth + 1);
-      if (found !== null) return found;
-    }
-    return null;
-  }
-
-  function refreshQuestionsFromPhaserFallback() {
-    const devices = globalThis.stores?.phaser?.scene?.worldManager?.devices?.allDevices;
-    if (!Array.isArray(devices) || !devices.length) return;
-
-    for (const device of devices) {
-      const globalQuestionsRaw = deepFindValueByKey(device, (key) => key === "GLOBAL_questions");
-      if (typeof globalQuestionsRaw === "string") {
-        try {
-          const parsed = JSON.parse(globalQuestionsRaw);
-          if (Array.isArray(parsed) && parsed.length) {
-            zyroxAutoAnswerState.questions = parsed;
-            zyroxAutoAnswerState.answerDeviceId = device?.id ?? zyroxAutoAnswerState.answerDeviceId;
-          }
-        } catch (_) {}
-      }
-      const currentQuestionId = deepFindValueByKey(device, (key) => key.includes("_currentQuestionId"));
-      if (currentQuestionId) zyroxAutoAnswerState.currentQuestionId = currentQuestionId;
-    }
-  }
-
-  function findPhaserRoomSender() {
-    const scene = globalThis.stores?.phaser?.scene;
-    if (!scene) return null;
-    const roomCandidate = deepFindValueByKey(
-      scene,
-      (_, value) => value && typeof value.send === "function" && typeof value === "object"
-    );
-    return roomCandidate || null;
-  }
-
-  function getQuestionPrompt(question) {
-    return question?.text ?? question?.question ?? question?.prompt ?? question?.title ?? "";
-  }
-
-  function findCurrentQuestionFromDom() {
-    const questionTextEl = document.querySelector(
-      "[data-testid='question-text'], [class*='question'][class*='text'], .question, .Question-text, h1, h2"
-    );
-    const questionText = normalizeText(questionTextEl?.textContent);
-    if (!questionText) return null;
-    return zyroxAutoAnswerState.questions.find((q) => normalizeText(getQuestionPrompt(q)) === questionText) || null;
-  }
-
-  function tryAnswerViaDom(question) {
-    if (!question || !Array.isArray(question.answers)) return false;
-    if (zyroxAutoAnswerState.lastAnsweredId === question._id) return false;
-
-    const correct = question.answers.find((a) => a && a.correct);
-    if (!correct) return false;
-
-    const correctText = normalizeText(correct.text ?? correct.answer ?? correct.value);
-    if (!correctText) return false;
-
-    const clickable = [...document.querySelectorAll(
-      "button, [role='button'], .option, [class*='option'], [class*='answer'], [data-testid*='answer']"
-    )].filter((el) => normalizeText(el.textContent) === correctText);
-
-    if (!clickable.length) return false;
-    clickable[0].click();
-    zyroxAutoAnswerState.lastAnsweredId = question._id;
-    return true;
-  }
-
-  function answerCurrentQuestion() {
-    refreshQuestionsFromStoresFallback();
-    refreshQuestionsFromPhaserFallback();
-
-    const socketManager = getSocketManager();
-    if (!socketManager) {
-      if (globalThis.Phaser && zyroxAutoAnswerState.currentQuestionId && zyroxAutoAnswerState.answerDeviceId) {
-        const question = zyroxAutoAnswerState.questions.find((q) => q?._id == zyroxAutoAnswerState.currentQuestionId);
-        const answer = pickAnswerPayload(question);
-        const roomSender = findPhaserRoomSender();
-        if (answer && roomSender) {
-          roomSender.send("MESSAGE_FOR_DEVICE", {
-            key: "answered",
-            deviceId: zyroxAutoAnswerState.answerDeviceId,
-            data: { answer },
-          });
-          zyroxAutoAnswerState.lastAnsweredId = question?._id || null;
-          console.log(`[Zyrox][AutoAnswer] Answered via Phaser room sender: ${question?._id}`);
-          return;
-        }
-      }
-
-      const domQuestion = findCurrentQuestionFromDom();
-      const answered = tryAnswerViaDom(domQuestion);
-      if (!answered) {
-        if (Date.now() - zyroxAutoAnswerState.lastDebugAt > 3000) {
-          console.log("[Zyrox][AutoAnswer] No socket manager and no DOM match yet.", {
-            questionCount: zyroxAutoAnswerState.questions.length,
-          });
-          zyroxAutoAnswerState.lastDebugAt = Date.now();
-        }
-      }
-      return;
-    }
-
-    const transportType = getTransportType(socketManager);
-
-    if (transportType === "colyseus") {
-      if (!zyroxAutoAnswerState.currentQuestionId || !zyroxAutoAnswerState.answerDeviceId) return;
-      const question = zyroxAutoAnswerState.questions.find((q) => q?._id == zyroxAutoAnswerState.currentQuestionId);
-      const answer = pickAnswerPayload(question);
-      if (!answer) return;
-
-      socketManager.sendMessage("MESSAGE_FOR_DEVICE", {
-        key: "answered",
-        deviceId: zyroxAutoAnswerState.answerDeviceId,
-        data: { answer },
-      });
-      zyroxAutoAnswerState.lastAnsweredId = question._id;
-      console.log(`[Zyrox][AutoAnswer] Answered colyseus question ${question._id}`);
-      return;
-    }
-
-    const questionId = zyroxAutoAnswerState.questionIdList[zyroxAutoAnswerState.currentQuestionIndex];
-    if (!questionId) return;
-    const question = zyroxAutoAnswerState.questions.find((q) => q?._id == questionId);
-    const answer = pickAnswerPayload(question);
-    if (!answer) return;
-    socketManager.sendMessage("QUESTION_ANSWERED", { answer, questionId });
-    zyroxAutoAnswerState.lastAnsweredId = question._id;
-    console.log(`[Zyrox][AutoAnswer] Answered blueboat question ${questionId}`);
-  }
-
-  function ensureAutoAnswerListeners() {
-    if (zyroxAutoAnswerState.listenersAttached) return true;
-    const socketManager = getSocketManager();
-    if (!socketManager) return false;
-
-    socketManager.addEventListener("deviceChanges", (event) => {
-      for (const { id, data } of event.detail || []) {
-        for (const key in data || {}) {
-          if (key === "GLOBAL_questions") {
-            try {
-              zyroxAutoAnswerState.questions = JSON.parse(data[key]);
-              zyroxAutoAnswerState.answerDeviceId = id;
-            } catch (_) {}
-          }
-          if (zyroxAutoAnswerState.playerId && key === `PLAYER_${zyroxAutoAnswerState.playerId}_currentQuestionId`) {
-            zyroxAutoAnswerState.currentQuestionId = data[key];
-          }
-        }
-      }
-    });
-
-    socketManager.addEventListener("colyseusMessage", (event) => {
-      if (event.detail?.type === "AUTH_ID") {
-        zyroxAutoAnswerState.playerId = event.detail?.message ?? null;
-      }
-    });
-
-    socketManager.addEventListener("blueboatMessage", (event) => {
-      if (event.detail?.key !== "STATE_UPDATE") return;
-      const payload = event.detail?.data;
-      if (!payload) return;
-      if (payload.type === "GAME_QUESTIONS") zyroxAutoAnswerState.questions = payload.value || [];
-      if (payload.type === "PLAYER_QUESTION_LIST") {
-        zyroxAutoAnswerState.questionIdList = payload.value?.questionList || [];
-        zyroxAutoAnswerState.currentQuestionIndex = payload.value?.questionIndex ?? -1;
-      }
-      if (payload.type === "PLAYER_QUESTION_LIST_INDEX") {
-        zyroxAutoAnswerState.currentQuestionIndex = Number(payload.value ?? -1);
-      }
-    });
-
-    zyroxAutoAnswerState.listenersAttached = true;
-    return true;
-  }
-
+  // ---------------------------------------------------------------------------
+  // AUTO-ANSWER MODULE CONTROLS
+  // The actual logic runs in page context (injected above).
+  // These functions just start/stop the interval via window.__zyroxAutoAnswer.
+  // ---------------------------------------------------------------------------
   function stopAutoAnswer() {
-    if (zyroxAutoAnswerState.intervalId) {
-      clearInterval(zyroxAutoAnswerState.intervalId);
-      zyroxAutoAnswerState.intervalId = null;
-      console.log("[Zyrox] Auto Answer stopped");
-    }
+    window.__zyroxAutoAnswer?.stop();
   }
 
   function startAutoAnswer() {
-    ensureAutoAnswerListeners();
-    stopAutoAnswer();
     const cfg = moduleCfg("Auto Answer");
-    const speed = Math.max(100, Number(cfg.speed) || 1000);
-    zyroxAutoAnswerState.intervalId = setInterval(answerCurrentQuestion, speed);
-    console.log(`[Zyrox] Auto Answer started (${speed}ms)`);
+    const speed = Math.max(200, Number(cfg.speed) || 1000);
+    window.__zyroxAutoAnswer?.start(speed);
   }
 
   function refreshAutoAnswerLoopIfEnabled() {
@@ -2235,16 +1983,24 @@
 
         if (setting.type === "slider") {
           if (cfg[setting.id] === undefined) cfg[setting.id] = setting.default ?? setting.min ?? 0;
+          const initialVal = cfg[setting.id];
           settingCard.innerHTML = `
-            <label>${setting.label}</label>
-            <input type="range" class="set-module-setting" data-setting-id="${setting.id}" min="${setting.min}" max="${setting.max}" step="${setting.step}" value="${cfg[setting.id]}" />
+            <label style="display:flex;justify-content:space-between;align-items:center;">
+              <span>${setting.label}</span>
+              <span class="zyrox-slider-value" style="font-size:0.85em;opacity:0.75;min-width:52px;text-align:right;">${initialVal}ms</span>
+            </label>
+            <input type="range" class="set-module-setting" data-setting-id="${setting.id}" min="${setting.min}" max="${setting.max}" step="${setting.step}" value="${initialVal}" />
           `;
           const settingInput = settingCard.querySelector(".set-module-setting");
+          const valueLabel = settingCard.querySelector(".zyrox-slider-value");
           if (settingInput) {
             settingInput.addEventListener("input", (event) => {
-              cfg[setting.id] = Number(event.target.value);
+              const newVal = Number(event.target.value);
+              cfg[setting.id] = newVal;
+              if (valueLabel) valueLabel.textContent = newVal + "ms";
               if (moduleName === "Auto Answer" && setting.id === "speed") {
-                refreshAutoAnswerLoopIfEnabled();
+                // Live-update the interval speed without requiring a toggle
+                window.__zyroxAutoAnswer?.start(newVal);
               }
             });
           }
@@ -3123,4 +2879,6 @@
     shell.style.width = `${width}px`;
     shell.style.height = `${height}px`;
   });
+
+  }); // end DOMContentLoaded
 })();
