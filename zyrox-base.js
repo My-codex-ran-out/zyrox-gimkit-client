@@ -1055,6 +1055,19 @@
     return Object.values(map);
   }
 
+  function getCharacterEntries(stores) {
+    const manager = stores?.phaser?.scene?.characterManager;
+    const map = manager?.characters;
+    if (!map) return [];
+    if (typeof map.entries === "function") {
+      return Array.from(map.entries(), ([id, character]) => ({ id, character }));
+    }
+    if (Array.isArray(map)) {
+      return map.map((character, index) => ({ id: character?.id ?? character?.characterId ?? index, character }));
+    }
+    return Object.entries(map).map(([id, character]) => ({ id, character }));
+  }
+
   function getMainCharacter(stores) {
     const mainId = stores?.phaser?.mainCharacter?.id;
     const manager = stores?.phaser?.scene?.characterManager;
@@ -1068,8 +1081,30 @@
     return character?.teamId ?? character?.team?.id ?? character?.state?.teamId ?? character?.data?.teamId ?? null;
   }
 
-  function getCharacterName(character) {
-    return character?.name ?? character?.displayName ?? character?.state?.name ?? "Player";
+  function getCharacterId(character) {
+    return character?.id ?? character?.characterId ?? character?.playerId ?? character?.entityId ?? null;
+  }
+
+  function getSerializerCharacterById(id) {
+    if (id == null) return null;
+    const map = window?.serializer?.state?.characters?.$items;
+    if (!map || typeof map.get !== "function") return null;
+    return map.get(id) || map.get(String(id)) || null;
+  }
+
+  function getCharacterName(character, fallbackId = null) {
+    const id = getCharacterId(character) ?? fallbackId;
+    const serializerCharacter = getSerializerCharacterById(id);
+    return character?.name
+      ?? character?.displayName
+      ?? character?.state?.name
+      ?? character?.username
+      ?? character?.playerName
+      ?? character?.profile?.name
+      ?? serializerCharacter?.name
+      ?? serializerCharacter?.displayName
+      ?? serializerCharacter?.username
+      ?? String(fallbackId ?? "Player");
   }
 
   function getEspRenderConfig() {
@@ -1089,7 +1124,7 @@
       arrowSize: 14,
       arrowColor: "#ff3b3b",
       arrowStyle: "regular",
-      valueTextColor: "#ffffff",
+      valueTextColor: window.__zyroxEspValueTextColor || "#ffffff",
     };
     const liveCfg = window.__zyroxEspConfig;
     if (liveCfg && typeof liveCfg === "object") return { ...defaults, ...liveCfg };
@@ -1123,7 +1158,9 @@
     const zoom = Number(camera?.zoom ?? 1) || 1;
     if (!Number.isFinite(camX) || !Number.isFinite(camY)) return;
 
-    for (const character of getCharacters(stores)) {
+    for (const entry of getCharacterEntries(stores)) {
+      const character = entry.character;
+      const characterId = entry.id ?? getCharacterId(character);
       if (!character || character === me) continue;
       const pos = getCharacterPosition(character);
       if (!pos) continue;
@@ -1226,7 +1263,7 @@
       ctx.textBaseline = "middle";
       const labelX = onScreen ? screenX : Math.cos(angle) * Math.min(250, distance) + canvas.width / 2;
       const labelY = onScreen ? (screenY - 18) : Math.sin(angle) * Math.min(250, distance) + canvas.height / 2;
-      ctx.fillText(`${getCharacterName(character)} (${Math.floor(distance)})`, labelX, labelY);
+      ctx.fillText(`${getCharacterName(character, characterId)} (${Math.floor(distance)})`, labelX, labelY);
     }
   }
 
@@ -1345,7 +1382,6 @@
                 { id: "tracerColor", label: "Tracer Color", type: "color", default: "#ff3b3b" },
                 { id: "arrowSize", label: "Arrow Size", type: "slider", min: 8, max: 30, step: 1, default: 14, unit: "px" },
                 { id: "arrowColor", label: "Arrow Color", type: "color", default: "#ff3b3b" },
-                { id: "valueTextColor", label: "Value Text Color", type: "color", default: "#ffffff" },
                 {
                   id: "arrowStyle",
                   label: "Arrow Style",
@@ -1908,6 +1944,10 @@
       outline: 1px solid var(--zyx-outline-color);
       outline-offset: 1px;
     }
+    .zyrox-setting-card select option {
+      background: #17171f;
+      color: var(--zyx-settings-text);
+    }
     .zyrox-gradient-pair { display: inline-flex; align-items: center; gap: 8px; }
     .zyrox-preset-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
     .zyrox-preset-btn { border: 1px solid var(--zyx-outline-color); background: rgba(0,0,0,.26); color: var(--zyx-settings-text); border-radius: 8px; padding: 6px 10px; font-size: 11px; cursor: pointer; }
@@ -2189,6 +2229,10 @@
             <label>Settings Card Background</label>
             <input type="color" class="set-settings-card-bg" value="#ffffff" />
           </div>
+          <div class="zyrox-setting-card">
+            <label>ESP Value Text Color</label>
+            <input type="color" class="set-esp-value-text-color" value="#ffffff" />
+          </div>
         </div>
       </div>
       <div class="zyrox-settings-pane hidden" data-pane="appearance">
@@ -2293,6 +2337,7 @@
   const settingsSubtextInput = settingsMenu.querySelector(".set-settings-subtext");
   const settingsCardBorderInput = settingsMenu.querySelector(".set-settings-card-border");
   const settingsCardBgInput = settingsMenu.querySelector(".set-settings-card-bg");
+  const espValueTextColorInput = settingsMenu.querySelector(".set-esp-value-text-color");
   const scaleInput = settingsMenu.querySelector(".set-scale");
   const radiusInput = settingsMenu.querySelector(".set-radius");
   const blurInput = settingsMenu.querySelector(".set-blur");
@@ -2528,9 +2573,6 @@
               </select>
             </label>
           </span>
-          <label>Value Text
-            <input type="color" class="esp-value-text-color" value="${cfg.valueTextColor}" />
-          </label>
         </div>
       `);
 
@@ -2619,14 +2661,6 @@
       if (arrowStyleInput) {
         arrowStyleInput.addEventListener("change", (event) => {
           cfg.arrowStyle = String(event.target.value || "regular");
-          syncEsp();
-        });
-      }
-      const valueTextColorInput = offscreenRow.querySelector(".esp-value-text-color");
-      if (valueTextColorInput) {
-        valueTextColorInput.addEventListener("input", (event) => {
-          cfg.valueTextColor = String(event.target.value || "#ffffff");
-          applyValueTextColor();
           syncEsp();
         });
       }
@@ -2766,6 +2800,7 @@
       settingsSubtext: settingsSubtextInput.value,
       settingsCardBorder: settingsCardBorderInput.value,
       settingsCardBg: settingsCardBgInput.value,
+      espValueTextColor: espValueTextColorInput.value,
       scale: scaleInput.value,
       radius: radiusInput.value,
       blur: blurInput.value,
@@ -2884,7 +2919,7 @@
           outline: "#37d878", text: "#d7ffe6", muted: "#88b79b", soft: "#a8ffd0", search: "#e6fff0", icon: "#d7ffe9",
           panelText: "#d9ffe8", panelBorder: "#5fff99", panelBg: "#04110a", slider: "#2dff75", checkmark: "#2dff75",
           headerStart: "#2dff75", headerEnd: "#0f2f1b", headerText: "#f0fff4",
-          settingsHeaderStart: "#2dff75", settingsHeaderEnd: "#0f2f1b",
+          settingsHeaderStart: "#2dff75", settingsHeaderEnd: "#0f2f1b", espValueTextColor: "#ffffff",
         };
       }
       if (presetName === "ice") {
@@ -2893,7 +2928,7 @@
           outline: "#6fbce8", text: "#d7edff", muted: "#8ea7bd", soft: "#b8e5ff", search: "#e7f5ff", icon: "#dff3ff",
           panelText: "#e1f4ff", panelBorder: "#8fd7ff", panelBg: "#071019", slider: "#7bdfff", checkmark: "#7bdfff",
           headerStart: "#6cd8ff", headerEnd: "#133042", headerText: "#f4fbff",
-          settingsHeaderStart: "#6cd8ff", settingsHeaderEnd: "#133042",
+          settingsHeaderStart: "#6cd8ff", settingsHeaderEnd: "#133042", espValueTextColor: "#ffffff",
         };
       }
       if (presetName === "grayscale") {
@@ -2902,7 +2937,7 @@
           outline: "#9a9a9a", text: "#dddddd", muted: "#9a9a9a", soft: "#c9c9c9", search: "#f1f1f1", icon: "#f5f5f5",
           panelText: "#efefef", panelBorder: "#a0a0a0", panelBg: "#0f0f0f", slider: "#c4c4c4", checkmark: "#d0d0d0",
           headerStart: "#8f8f8f", headerEnd: "#1d1d1d", headerText: "#ffffff",
-          settingsHeaderStart: "#8f8f8f", settingsHeaderEnd: "#1d1d1d",
+          settingsHeaderStart: "#8f8f8f", settingsHeaderEnd: "#1d1d1d", espValueTextColor: "#ffffff",
         };
       }
       // Default (red)
@@ -2911,7 +2946,7 @@
         outline: "#ff5b5b", text: "#d6d6df", muted: "#9b9bab", soft: "#ffbdbd", search: "#ffe6e6", icon: "#ffdada",
         panelText: "#ffd9d9", panelBorder: "#ff6464", panelBg: "#08080a", slider: "#ff6b6b", checkmark: "#ff6b6b",
         headerStart: "#ff4a4a", headerEnd: "#3c1212", headerText: "#ffffff",
-        settingsHeaderStart: "#ff3d3d", settingsHeaderEnd: "#2d0c0c",
+        settingsHeaderStart: "#ff3d3d", settingsHeaderEnd: "#2d0c0c", espValueTextColor: "#ffffff",
       };
     })();
 
@@ -2936,6 +2971,7 @@
     headerTextInput.value = preset.headerText;
     settingsHeaderStartInput.value = preset.settingsHeaderStart;
     settingsHeaderEndInput.value = preset.settingsHeaderEnd;
+    espValueTextColorInput.value = preset.espValueTextColor;
     applyAppearance();
   }
 
@@ -2982,6 +3018,7 @@
     const settingsSubtext = settingsSubtextInput.value;
     const settingsCardBorder = settingsCardBorderInput.value;
     const settingsCardBg = settingsCardBgInput.value;
+    const espValueTextColor = espValueTextColorInput.value;
     const scale = Number(scaleInput.value) / 100;
     const radius = Number(radiusInput.value);
     const blur = Number(blurInput.value);
@@ -3017,6 +3054,8 @@
     cssRoot.setProperty("--zyx-settings-card-bg", toRgba(settingsCardBg, 0.05));
     cssRoot.setProperty("--zyx-slider-color", sliderColor);
     cssRoot.setProperty("--zyx-checkmark-color", checkmarkColor);
+    window.__zyroxEspValueTextColor = espValueTextColor;
+    window.__zyroxEspConfig = { ...getEspRenderConfig(), valueTextColor: espValueTextColor };
     cssRoot.setProperty("--zyx-radius-xl", `${radius}px`);
     cssRoot.setProperty("--zyx-radius-lg", `${Math.max(4, radius - 2)}px`);
     cssRoot.setProperty("--zyx-radius-md", `${Math.max(3, radius - 4)}px`);
@@ -3196,6 +3235,7 @@
   settingsSubtextInput.addEventListener("input", applyAppearance);
   settingsCardBorderInput.addEventListener("input", applyAppearance);
   settingsCardBgInput.addEventListener("input", applyAppearance);
+  espValueTextColorInput.addEventListener("input", applyAppearance);
   scaleInput.addEventListener("input", applyAppearance);
   radiusInput.addEventListener("input", applyAppearance);
   blurInput.addEventListener("input", applyAppearance);
@@ -3236,6 +3276,7 @@
     settingsSubtextInput.value = "#c2c2ce";
     settingsCardBorderInput.value = "#ffffff";
     settingsCardBgInput.value = "#ffffff";
+    espValueTextColorInput.value = "#ffffff";
     searchAutofocusInput.checked = true;
     state.searchAutofocus = true;
     scaleInput.value = "100";
@@ -3395,6 +3436,7 @@
         assign(settingsSubtextInput, "settingsSubtext");
         assign(settingsCardBorderInput, "settingsCardBorder");
         assign(settingsCardBgInput, "settingsCardBg");
+        assign(espValueTextColorInput, "espValueTextColor");
         assign(scaleInput, "scale");
         assign(radiusInput, "radius");
         assign(blurInput, "blur");
