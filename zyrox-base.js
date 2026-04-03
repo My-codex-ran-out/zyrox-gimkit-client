@@ -1472,7 +1472,7 @@
     moduleItems: new Map(),
     modulePanels: new Map(),
     moduleEntries: [],
-    moduleSettings: new Map(),
+    moduleConfig: new Map(),
     collapsedPanels: {},
     listeningForBind: null,
     listeningForMenuBind: false,
@@ -1489,9 +1489,21 @@
 
   // Bumped to v3 — includes display-mode and loose layout position persistence
   const STORAGE_KEY = "zyrox_client_settings_v3";
+  const DEFAULT_FOOTER_HTML = () => `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
+
+  function debounce(fn, waitMs = 120) {
+    let timerId = null;
+    return (...args) => {
+      if (timerId) clearTimeout(timerId);
+      timerId = setTimeout(() => {
+        timerId = null;
+        fn(...args);
+      }, waitMs);
+    };
+  }
 
   // Defer all DOM work — WebSocket is already patched above at document-start.
-  document.addEventListener("DOMContentLoaded", () => {
+  function initUi() {
 
   const style = document.createElement("style");
   style.textContent = `
@@ -2163,7 +2175,7 @@
 
   const footer = document.createElement("div");
   footer.className = "zyrox-footer";
-  footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
+  setFooterText();
 
   const resizeHandle = document.createElement("div");
   resizeHandle.className = "zyrox-resize-handle";
@@ -2492,6 +2504,10 @@
   function setBindButtonText(text) {
     const bindButton = currentSetBindBtn || setBindButtonEl || configMenu.querySelector(".set-bind-btn");
     if (bindButton) bindButton.textContent = text;
+  }
+
+  function setFooterText() {
+    footer.innerHTML = DEFAULT_FOOTER_HTML();
   }
 
   function setCurrentBindText(bind) {
@@ -2952,7 +2968,7 @@
       loosePositions: state.loosePositions,
       loosePanelPositions: state.loosePanelPositions,
       collapsedPanels: state.collapsedPanels,
-      moduleSettings: Array.from(state.moduleSettings.entries()), // Convert Map to array for serialization
+      moduleConfig: Array.from(ensureModuleConfigStore().entries()),
     };
   }
 
@@ -3129,6 +3145,15 @@
   }
 
   function applyAppearance() {
+    const normalizeHex = (value, fallback) => {
+      const normalized = String(value || "").trim();
+      return /^#([0-9a-fA-F]{6})$/.test(normalized) ? normalized.toLowerCase() : fallback;
+    };
+    const clampNumber = (value, min, max, fallback) => {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.min(max, Math.max(min, parsed));
+    };
     const toRgba = (hex, alpha) => {
       const h = hex.replace("#", "");
       const r = parseInt(h.slice(0, 2), 16);
@@ -3144,41 +3169,41 @@
       return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
     };
 
-    const shellBgStart = shellBgStartInput.value;
-    const shellBgEnd = shellBgEndInput.value;
-    const topbarColor = topbarColorInput.value;
-    const iconColor = iconColorInput.value;
-    const outlineColor = outlineColorInput.value;
-    const panelCountText = panelCountTextInput.value;
-    const panelCountBorder = panelCountBorderInput.value;
-    const panelCountBg = panelCountBgInput.value;
-    const border = borderInput.value;
-    const text = textInput.value;
-    const opacity = Number(opacityInput.value) / 100;
-    const sliderColor = sliderColorInput.value;
-    const checkmarkColor = checkmarkColorInput.value;
-    const selectBg = selectBgInput.value;
-    const selectText = selectTextInput.value;
-    const mutedText = mutedTextInput.value;
-    const accentSoft = accentSoftInput.value;
-    const searchText = searchTextInput.value;
+    const shellBgStart = normalizeHex(shellBgStartInput.value, "#ff3d3d");
+    const shellBgEnd = normalizeHex(shellBgEndInput.value, "#000000");
+    const topbarColor = normalizeHex(topbarColorInput.value, "#ff4a4a");
+    const iconColor = normalizeHex(iconColorInput.value, "#ffdada");
+    const outlineColor = normalizeHex(outlineColorInput.value, "#ff5b5b");
+    const panelCountText = normalizeHex(panelCountTextInput.value, "#ffd9d9");
+    const panelCountBorder = normalizeHex(panelCountBorderInput.value, "#ff6464");
+    const panelCountBg = normalizeHex(panelCountBgInput.value, "#1a1a1e");
+    const border = normalizeHex(borderInput.value, "#ff6f6f");
+    const text = normalizeHex(textInput.value, "#d6d6df");
+    const opacity = clampNumber(opacityInput.value, 10, 100, 45) / 100;
+    const sliderColor = normalizeHex(sliderColorInput.value, "#ff6b6b");
+    const checkmarkColor = normalizeHex(checkmarkColorInput.value, "#ff6b6b");
+    const selectBg = normalizeHex(selectBgInput.value, "#17171f");
+    const selectText = normalizeHex(selectTextInput.value, "#ffe5e5");
+    const mutedText = normalizeHex(mutedTextInput.value, "#9b9bab");
+    const accentSoft = normalizeHex(accentSoftInput.value, "#ffbdbd");
+    const searchText = normalizeHex(searchTextInput.value, "#ffe6e6");
     const font = fontInput.value;
-    const headerStart = headerStartInput.value;
-    const headerEnd = headerEndInput.value;
-    const headerText = headerTextInput.value;
-    const settingsHeaderStart = settingsHeaderStartInput.value;
-    const settingsHeaderEnd = settingsHeaderEndInput.value;
-    const settingsSidebar = settingsSidebarInput.value;
-    const settingsBody = settingsBodyInput.value;
-    const settingsText = settingsTextInput.value;
-    const settingsSubtext = settingsSubtextInput.value;
-    const settingsCardBorder = settingsCardBorderInput.value;
-    const settingsCardBg = settingsCardBgInput.value;
-    const espValueTextColor = espValueTextColorInput.value;
-    const scale = Number(scaleInput.value) / 100;
-    const radius = Number(radiusInput.value);
-    const blur = Number(blurInput.value);
-    const hoverShift = Number(hoverShiftInput.value);
+    const headerStart = normalizeHex(headerStartInput.value, "#ff4a4a");
+    const headerEnd = normalizeHex(headerEndInput.value, "#3c1212");
+    const headerText = normalizeHex(headerTextInput.value, "#ffffff");
+    const settingsHeaderStart = normalizeHex(settingsHeaderStartInput.value, "#ff3d3d");
+    const settingsHeaderEnd = normalizeHex(settingsHeaderEndInput.value, "#2d0c0c");
+    const settingsSidebar = normalizeHex(settingsSidebarInput.value, "#181820");
+    const settingsBody = normalizeHex(settingsBodyInput.value, "#121216");
+    const settingsText = normalizeHex(settingsTextInput.value, "#ffe5e5");
+    const settingsSubtext = normalizeHex(settingsSubtextInput.value, "#c2c2ce");
+    const settingsCardBorder = normalizeHex(settingsCardBorderInput.value, "#ffffff");
+    const settingsCardBg = normalizeHex(settingsCardBgInput.value, "#ffffff");
+    const espValueTextColor = normalizeHex(espValueTextColorInput.value, "#ffffff");
+    const scale = clampNumber(scaleInput.value, 80, 130, 100) / 100;
+    const radius = clampNumber(radiusInput.value, 8, 22, 14);
+    const blur = clampNumber(blurInput.value, 0, 24, 10);
+    const hoverShift = clampNumber(hoverShiftInput.value, 0, 8, 2);
     const cssRoot = document.documentElement.style;
     cssRoot.setProperty("--zyx-border", `${border}99`);
     cssRoot.setProperty("--zyx-text", text);
@@ -3333,7 +3358,7 @@
   settingsMenuKeyResetBtn.addEventListener("click", () => {
     CONFIG.toggleKey = CONFIG.defaultToggleKey;
     settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
-    footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
+    setFooterText();
     state.listeningForMenuBind = false;
   });
 
@@ -3361,9 +3386,10 @@
     }
   });
 
+  const applySearchFilterDebounced = debounce(applySearchFilter, 80);
   searchInput.addEventListener("input", () => {
     state.searchQuery = searchInput.value;
-    applySearchFilter();
+    applySearchFilterDebounced();
   });
 
   accentInput.addEventListener("input", applyAppearance);
@@ -3623,20 +3649,14 @@
         if (saved.collapsedPanels && typeof saved.collapsedPanels === "object") {
           state.collapsedPanels = saved.collapsedPanels;
         }
-        if (saved.moduleSettings && Array.isArray(saved.moduleSettings)) {
-          state.moduleSettings = new Map(saved.moduleSettings);
-        }
-        // Apply module settings to active modules
-        for (const [moduleName, settings] of state.moduleSettings.entries()) {
-          const moduleInstance = state.modules.get(moduleName);
-          if (moduleInstance) {
-            // Assuming moduleInstance has a method to apply settings or settings are directly accessible
-            // For now, we'll just set the keybind, and other settings can be accessed directly from moduleCfg(moduleName)
-            moduleInstance.keybind = settings.keybind;
-          }
+        const savedModuleConfig = Array.isArray(saved.moduleConfig)
+          ? saved.moduleConfig
+          : (Array.isArray(saved.moduleSettings) ? saved.moduleSettings : null);
+        if (savedModuleConfig) {
+          state.moduleConfig = new Map(savedModuleConfig);
         }
         settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
-        footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
+        setFooterText();
       }
     }
   } catch (_) {}
@@ -3647,6 +3667,11 @@
   syncCollapseButtons();
   applyAppearance();
   setDisplayMode(state.displayMode);
+
+  const isTypingTarget = (target) => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+  };
 
   function setVisible(nextVisible) {
     state.visible = nextVisible;
@@ -3677,7 +3702,7 @@
       event.preventDefault();
       CONFIG.toggleKey = event.key;
       settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
-      footer.innerHTML = `<span>Press <b>${CONFIG.toggleKey}</b> to show/hide menu</span><span>Right click modules for settings</span>`;
+      setFooterText();
       state.listeningForMenuBind = false;
       return;
     }
@@ -3695,10 +3720,13 @@
     }
 
     if (event.key === CONFIG.toggleKey) {
+      if (isTypingTarget(event.target)) return;
       event.preventDefault();
       setVisible(!state.visible);
       return;
     }
+
+    if (isTypingTarget(event.target)) return;
 
     for (const [moduleName, cfg] of ensureModuleConfigStore()) {
       if (cfg.keybind && cfg.keybind === event.key) {
@@ -3824,5 +3852,11 @@
     });
   });
 
-  }); // end DOMContentLoaded
+  } // end initUi
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initUi, { once: true });
+  } else {
+    initUi();
+  }
 })();
