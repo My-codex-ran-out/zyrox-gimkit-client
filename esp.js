@@ -121,27 +121,45 @@
       const isTeammate = myTeam !== null && getCharTeam(char) === myTeam;
       const angle = Math.atan2(pos.y - camY, pos.x - camX);
       const distance = Math.hypot(pos.x - camX, pos.y - camY) * zoom;
+      const screenX = (pos.x - camX) * zoom + canvas.width / 2;
+      const screenY = (pos.y - camY) * zoom + canvas.height / 2;
+      const color = isTeammate ? 'green' : 'red';
+      const onScreen = screenX >= 0 && screenX <= canvas.width && screenY >= 0 && screenY <= canvas.height;
 
-      const arrowDist = Math.min(250, distance);
-      const tipX = Math.cos(angle) * arrowDist + canvas.width / 2;
-      const tipY = Math.sin(angle) * arrowDist + canvas.height / 2;
-      const leftAngle = angle + (Math.PI * 3) / 4;
-      const rightAngle = angle - (Math.PI * 3) / 4;
+      if (onScreen) {
+        const boxSize = Math.max(24, 80 / zoom);
+        ctx.beginPath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = color;
+        ctx.strokeRect(screenX - boxSize / 2, screenY - boxSize / 2, boxSize, boxSize);
+      } else {
+        const margin = 20;
+        const halfW = canvas.width / 2 - margin;
+        const halfH = canvas.height / 2 - margin;
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        const scale = Math.min(
+          Math.abs(halfW / (dx || 0.0001)),
+          Math.abs(halfH / (dy || 0.0001))
+        );
+        const endX = canvas.width / 2 + dx * scale;
+        const endY = canvas.height / 2 + dy * scale;
 
-      ctx.beginPath();
-      ctx.moveTo(tipX, tipY);
-      ctx.lineTo(tipX + Math.cos(leftAngle) * 50, tipY + Math.sin(leftAngle) * 50);
-      ctx.moveTo(tipX, tipY);
-      ctx.lineTo(tipX + Math.cos(rightAngle) * 50, tipY + Math.sin(rightAngle) * 50);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = isTeammate ? 'green' : 'red';
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2, canvas.height / 2);
+        ctx.lineTo(endX, endY);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      }
 
       ctx.fillStyle = 'black';
       ctx.font = '20px Verdana';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`${getCharName(char)} (${Math.floor(distance)})`, tipX, tipY);
+      const labelX = onScreen ? screenX : Math.cos(angle) * Math.min(250, distance) + canvas.width / 2;
+      const labelY = onScreen ? (screenY - 18) : Math.sin(angle) * Math.min(250, distance) + canvas.height / 2;
+      ctx.fillText(`${getCharName(char)} (${Math.floor(distance)})`, labelX, labelY);
     }
   }
 
