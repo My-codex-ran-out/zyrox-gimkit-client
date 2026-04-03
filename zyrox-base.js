@@ -1086,10 +1086,8 @@
       arrowSize: 14,
       arrowColor: "#ff3b3b",
     };
-    if (typeof moduleCfg === "function") {
-      const cfg = moduleCfg("ESP");
-      if (cfg && typeof cfg === "object") return { ...defaults, ...cfg };
-    }
+    const liveCfg = window.__zyroxEspConfig;
+    if (liveCfg && typeof liveCfg === "object") return { ...defaults, ...liveCfg };
     return defaults;
   }
 
@@ -2259,7 +2257,11 @@
       }
       store.set(name, { keybind: null, ...settings });
     }
-    return store.get(name);
+    const cfg = store.get(name);
+    if (name === "ESP") {
+      window.__zyroxEspConfig = { ...getEspRenderConfig(), ...cfg };
+    }
+    return cfg;
   }
 
   function setBindLabel(item, moduleName) {
@@ -2277,10 +2279,12 @@
     if (moduleInstance.enabled) {
       moduleInstance.disable();
       item.classList.remove("active");
+      state.enabledModules.delete(moduleName);
       if (moduleName === "Auto Answer") stopAutoAnswer();
     } else {
       moduleInstance.enable();
       item.classList.add("active");
+      state.enabledModules.add(moduleName);
       if (moduleName === "Auto Answer") startAutoAnswer();
     }
   }
@@ -2354,7 +2358,112 @@
       });
     }
 
-    if (moduleLayout && Array.isArray(moduleLayout.settings)) {
+    if (moduleName === "ESP") {
+      const defaults = getEspRenderConfig();
+      Object.assign(cfg, { ...defaults, ...cfg });
+      window.__zyroxEspConfig = { ...cfg };
+
+      const makeRow = (title, html) => {
+        const row = document.createElement("div");
+        row.className = "zyrox-setting-card";
+        row.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+            <label style="font-weight:600;">${title}</label>
+            ${html}
+          </div>
+        `;
+        configBody.appendChild(row);
+        return row;
+      };
+
+      const hitboxRow = makeRow("Hitbox", `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="esp-hitbox-enabled" ${cfg.hitbox ? "checked" : ""} /> Enabled</label>
+          <label>Size <input type="range" class="esp-hitbox-size" min="24" max="180" step="2" value="${cfg.hitboxSize}" /></label>
+          <span class="esp-hitbox-size-value">${cfg.hitboxSize}px</span>
+          <input type="color" class="esp-hitbox-color" value="${cfg.hitboxColor}" />
+        </div>
+      `);
+
+      const namesRow = makeRow("Names", `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;"><input type="checkbox" class="esp-names-enabled" ${cfg.names ? "checked" : ""} /> Enabled</label>
+          <label>Size <input type="range" class="esp-name-size" min="10" max="32" step="1" value="${cfg.nameSize}" /></label>
+          <span class="esp-name-size-value">${cfg.nameSize}px</span>
+          <input type="color" class="esp-name-color" value="${cfg.nameColor}" />
+        </div>
+      `);
+
+      const offscreenRow = makeRow("Off-screen", `
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <label>Mode
+            <select class="esp-offscreen-style">
+              <option value="tracers" ${cfg.offscreenStyle === "tracers" ? "selected" : ""}>Tracers</option>
+              <option value="arrows" ${cfg.offscreenStyle === "arrows" ? "selected" : ""}>Arrows</option>
+            </select>
+          </label>
+          <label>Tracer Width <input type="range" class="esp-tracer-width" min="1" max="8" step="1" value="${cfg.tracerWidth}" /></label>
+          <span class="esp-tracer-width-value">${cfg.tracerWidth}px</span>
+          <input type="color" class="esp-tracer-color" value="${cfg.tracerColor}" />
+          <label>Arrow Size <input type="range" class="esp-arrow-size" min="8" max="30" step="1" value="${cfg.arrowSize}" /></label>
+          <span class="esp-arrow-size-value">${cfg.arrowSize}px</span>
+          <input type="color" class="esp-arrow-color" value="${cfg.arrowColor}" />
+        </div>
+      `);
+
+      const syncEsp = () => {
+        window.__zyroxEspConfig = { ...cfg };
+      };
+      syncEsp();
+
+      const bindCheckbox = (root, selector, key) => {
+        const input = root.querySelector(selector);
+        if (!input) return;
+        input.addEventListener("change", (event) => {
+          cfg[key] = Boolean(event.target.checked);
+          syncEsp();
+        });
+      };
+      const bindColor = (root, selector, key) => {
+        const input = root.querySelector(selector);
+        if (!input) return;
+        input.addEventListener("input", (event) => {
+          cfg[key] = String(event.target.value || "#ffffff");
+          syncEsp();
+        });
+      };
+      const bindSlider = (root, selector, key, labelSelector) => {
+        const input = root.querySelector(selector);
+        const label = root.querySelector(labelSelector);
+        if (!input) return;
+        input.addEventListener("input", (event) => {
+          const value = Number(event.target.value);
+          cfg[key] = value;
+          if (label) label.textContent = `${value}px`;
+          syncEsp();
+        });
+      };
+
+      bindCheckbox(hitboxRow, ".esp-hitbox-enabled", "hitbox");
+      bindSlider(hitboxRow, ".esp-hitbox-size", "hitboxSize", ".esp-hitbox-size-value");
+      bindColor(hitboxRow, ".esp-hitbox-color", "hitboxColor");
+
+      bindCheckbox(namesRow, ".esp-names-enabled", "names");
+      bindSlider(namesRow, ".esp-name-size", "nameSize", ".esp-name-size-value");
+      bindColor(namesRow, ".esp-name-color", "nameColor");
+
+      const styleInput = offscreenRow.querySelector(".esp-offscreen-style");
+      if (styleInput) {
+        styleInput.addEventListener("change", (event) => {
+          cfg.offscreenStyle = String(event.target.value || "tracers");
+          syncEsp();
+        });
+      }
+      bindSlider(offscreenRow, ".esp-tracer-width", "tracerWidth", ".esp-tracer-width-value");
+      bindColor(offscreenRow, ".esp-tracer-color", "tracerColor");
+      bindSlider(offscreenRow, ".esp-arrow-size", "arrowSize", ".esp-arrow-size-value");
+      bindColor(offscreenRow, ".esp-arrow-color", "arrowColor");
+    } else if (moduleLayout && Array.isArray(moduleLayout.settings)) {
       for (const setting of moduleLayout.settings) {
         const settingCard = document.createElement("div");
         settingCard.className = "zyrox-setting-card";
