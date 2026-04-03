@@ -16396,25 +16396,13 @@
 
 	function create_fragment$n(ctx) {
 		let canvas_1;
-		let t;
-		let group;
 		let current;
 		let mounted;
 		let dispose;
 
-		group = new Group({
-				props: {
-					name: "Player Highlighter",
-					$$slots: { default: [create_default_slot$g] },
-					$$scope: { ctx }
-				}
-			});
-
 		return {
 			c() {
 				canvas_1 = element("canvas");
-				t = space();
-				create_component(group.$$.fragment);
 				attr(canvas_1, "width", window.innerWidth);
 				attr(canvas_1, "height", window.innerHeight);
 				attr(canvas_1, "class", "svelte-gt58ph");
@@ -16422,8 +16410,6 @@
 			m(target, anchor) {
 				insert(target, canvas_1, anchor);
 				/*canvas_1_binding*/ ctx[5](canvas_1);
-				insert(target, t, anchor);
-				mount_component(group, target, anchor);
 				current = true;
 
 				if (!mounted) {
@@ -16431,32 +16417,15 @@
 					mounted = true;
 				}
 			},
-			p(ctx, [dirty]) {
-				const group_changes = {};
-
-				if (dirty & /*$$scope, highlightEnemies, highlightTeammates*/ 1030) {
-					group_changes.$$scope = { dirty, ctx };
-				}
-
-				group.$set(group_changes);
-			},
-			i(local) {
-				if (current) return;
-				transition_in(group.$$.fragment, local);
-				current = true;
-			},
-			o(local) {
-				transition_out(group.$$.fragment, local);
-				current = false;
-			},
+			p: noop,
+			i: noop,
+			o: noop,
 			d(detaching) {
 				if (detaching) {
 					detach(canvas_1);
-					detach(t);
 				}
 
 				/*canvas_1_binding*/ ctx[5](null);
-				destroy_component(group, detaching);
 				mounted = false;
 				dispose();
 			}
@@ -16474,8 +16443,8 @@
 			$$invalidate(0, canvas.height = window.innerHeight, canvas);
 		}
 
-		let highlightTeammates = false;
-		let highlightEnemies = false;
+		let highlightTeammates = true;
+		let highlightEnemies = true;
 
 		function render() {
 			if (!serializer?.state?.characters || !ctx) return;
@@ -21843,14 +21812,13 @@
 		}
 	}
 
-	async function createHud() {
+	async function createEsp() {
 	    if (!document.body) {
 	        await new Promise(res => window.addEventListener('DOMContentLoaded', res));
 	    }
-	    new Hud({
+	    new PlayerHighlighter({
 	        target: document.body
 	    });
-	    addVars();
 	}
 
 	async function exposeValues() {
@@ -21880,7 +21848,7 @@
 	else {
 	    exposeValues();
 	    socketManager.setup();
-	    createHud();
+	    createEsp();
 	}
 
 })();
