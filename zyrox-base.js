@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.4.2
+// @version      1.4.3
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.4.2";
+    const CLIENT_VERSION = "1.4.3";
     return CLIENT_VERSION;
   }
 
@@ -1665,6 +1665,13 @@
   }
 
   document.addEventListener("mousemove", (e) => {
+    const dx = e.clientX - crosshairState.mouseX;
+    const dy = e.clientY - crosshairState.mouseY;
+    const len = Math.hypot(dx, dy);
+    if (len > 0.0001) {
+      autoAimState.aimDirX = dx / len;
+      autoAimState.aimDirY = dy / len;
+    }
     crosshairState.mouseX = e.clientX;
     crosshairState.mouseY = e.clientY;
   }, { passive: true });
@@ -1697,6 +1704,8 @@
     statusText: "Idle",
     lastAimX: 0,
     lastAimY: 0,
+    aimDirX: 1,
+    aimDirY: 0,
   };
 
   const autoAimInputState = {
@@ -1713,7 +1722,6 @@
       requireLOS: false,
       onlyWhenGameFocused: true,
       showTargetRing: true,
-      debugStatus: true,
     };
     const stored = window.__zyroxTriggerAssistConfig;
     return stored && typeof stored === "object" ? { ...defaults, ...stored } : defaults;
@@ -1723,17 +1731,23 @@
     const defaults = {
       enabled: true,
       teamCheck: true,
-      fovPx: 160,
+      fovDeg: 120,
       smoothing: 0.2,
       maxStepPx: 32,
       stickToTarget: true,
       onlyWhenGameFocused: true,
       requireMouseDown: false,
       showDebugDot: true,
-      debugStatus: true,
     };
     const stored = window.__zyroxAutoAimConfig;
-    return stored && typeof stored === "object" ? { ...defaults, ...stored } : defaults;
+    if (stored && typeof stored === "object") {
+      const merged = { ...defaults, ...stored };
+      if (merged.fovDeg == null && Number.isFinite(Number(stored.fovPx))) {
+        merged.fovDeg = Math.max(15, Math.min(180, Number(stored.fovPx)));
+      }
+      return merged;
+    }
+    return defaults;
   }
 
   function createTriggerAssistCanvas() {
@@ -1985,8 +1999,18 @@
     const width = window.innerWidth;
     const height = window.innerHeight;
     const margin = 80;
-    const fov = Math.max(8, Number(cfg.fovPx) || 160);
-    const stickyFov = fov * 1.2;
+    const fovDeg = Math.max(15, Math.min(180, Number(cfg.fovDeg) || 120));
+    const stickyFovDeg = Math.min(180, fovDeg * 1.15);
+    const aimDirX = Number(autoAimState.aimDirX) || 1;
+    const aimDirY = Number(autoAimState.aimDirY) || 0;
+    const angleToAimDir = (toX, toY) => {
+      const len = Math.hypot(toX, toY);
+      if (len <= 0.001) return 0;
+      const nx = toX / len;
+      const ny = toY / len;
+      const dot = Math.max(-1, Math.min(1, nx * aimDirX + ny * aimDirY));
+      return Math.acos(dot) * (180 / Math.PI);
+    };
     const canUseSticky = cfg.stickToTarget && autoAimState.target?.player;
     let stickyCandidate = null;
     let best = null;
@@ -2000,11 +2024,12 @@
       if (!screen) continue;
       if (screen.x < -margin || screen.x > width + margin || screen.y < -margin || screen.y > height + margin) continue;
       const dist = Math.hypot(mx - screen.x, my - screen.y);
-      if (dist <= fov && (!best || dist < best.distancePx)) {
-        best = { player, playerId: pid, screenX: screen.x, screenY: screen.y, distancePx: dist };
+      const angleDelta = angleToAimDir(screen.x - mx, screen.y - my);
+      if (angleDelta <= fovDeg && (!best || dist < best.distancePx)) {
+        best = { player, playerId: pid, screenX: screen.x, screenY: screen.y, distancePx: dist, angleDelta };
       }
-      if (canUseSticky && pid === String(autoAimState.target.playerId) && dist <= stickyFov) {
-        stickyCandidate = { player, playerId: pid, screenX: screen.x, screenY: screen.y, distancePx: dist };
+      if (canUseSticky && pid === String(autoAimState.target.playerId) && angleDelta <= stickyFovDeg) {
+        stickyCandidate = { player, playerId: pid, screenX: screen.x, screenY: screen.y, distancePx: dist, angleDelta };
       }
     }
     return stickyCandidate || best;
@@ -2076,6 +2101,13 @@
       const ratio = Math.min(1, step / dist);
       const nextX = crosshairState.mouseX + dx * ratio;
       const nextY = crosshairState.mouseY + dy * ratio;
+      const moveX = nextX - crosshairState.mouseX;
+      const moveY = nextY - crosshairState.mouseY;
+      const moveLen = Math.hypot(moveX, moveY);
+      if (moveLen > 0.0001) {
+        autoAimState.aimDirX = moveX / moveLen;
+        autoAimState.aimDirY = moveY / moveLen;
+      }
       crosshairState.mouseX = nextX;
       crosshairState.mouseY = nextY;
       autoAimState.lastAimX = nextX;
@@ -2402,7 +2434,20 @@
                 { id: "requireLOS",          label: "Require LOS (future)",     type: "checkbox", default: false },
                 { id: "onlyWhenGameFocused", label: "Only When Focused",        type: "checkbox", default: true },
                 { id: "showTargetRing",      label: "Show Target Ring",         type: "checkbox", default: true },
-                { id: "debugStatus",         label: "Show Debug Status",        type: "checkbox", default: true },
+              ],
+            },
+            {
+              name: "Auto Aim",
+              settings: [
+                { id: "enabled",             label: "Enabled",               type: "checkbox", default: true },
+                { id: "teamCheck",           label: "Ignore Teammates",      type: "checkbox", default: true },
+                { id: "fovDeg",              label: "Aim FOV",               type: "slider",   default: 120, min: 15, max: 180, step: 1, unit: "°" },
+                { id: "smoothing",           label: "Smoothing",             type: "slider",   default: 0.2, min: 0, max: 1, step: 0.01 },
+                { id: "maxStepPx",           label: "Max Step",              type: "slider",   default: 32, min: 2, max: 120, step: 1, unit: "px" },
+                { id: "stickToTarget",       label: "Stick To Target",       type: "checkbox", default: true },
+                { id: "onlyWhenGameFocused", label: "Only When Focused",     type: "checkbox", default: true },
+                { id: "requireMouseDown",    label: "Require Left Mouse",    type: "checkbox", default: false },
+                { id: "showDebugDot",        label: "Show Debug Dot",        type: "checkbox", default: true },
               ],
             },
             {
@@ -3980,16 +4025,6 @@
       const syncTriggerAssist = () => { window.__zyroxTriggerAssistConfig = { ...cfg }; };
       syncTriggerAssist();
 
-      const statusCard = document.createElement("div");
-      statusCard.className = "zyrox-setting-card";
-      statusCard.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-          <span style="font-weight:600;">Status</span>
-          <span class="zyrox-trigger-status" style="opacity:0.85;font-size:0.92em;">${triggerAssistState.statusText}</span>
-        </div>
-      `;
-      configBody.appendChild(statusCard);
-
       for (const setting of moduleLayout?.settings || []) {
         if (setting.type === "checkbox") {
           if (cfg[setting.id] === undefined) cfg[setting.id] = Boolean(setting.default);
@@ -4029,17 +4064,6 @@
           });
         }
       }
-
-      const statusValueEl = statusCard.querySelector(".zyrox-trigger-status");
-      const statusUpdater = setInterval(() => {
-        if (openConfigModule !== "Trigger Assist") {
-          clearInterval(statusUpdater);
-          return;
-        }
-        if (statusValueEl) {
-          statusValueEl.textContent = cfg.debugStatus ? triggerAssistState.statusText : "Hidden";
-        }
-      }, 120);
     } else if (moduleName === "Auto Aim") {
       const defaults = getAutoAimConfig();
       Object.assign(cfg, { ...defaults, ...cfg });
@@ -4047,16 +4071,6 @@
 
       const syncAutoAim = () => { window.__zyroxAutoAimConfig = { ...cfg }; };
       syncAutoAim();
-
-      const statusCard = document.createElement("div");
-      statusCard.className = "zyrox-setting-card";
-      statusCard.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-          <span style="font-weight:600;">Status</span>
-          <span class="zyrox-autoaim-status" style="opacity:0.85;font-size:0.92em;">${autoAimState.statusText}</span>
-        </div>
-      `;
-      configBody.appendChild(statusCard);
 
       for (const setting of moduleLayout?.settings || []) {
         if (setting.type === "checkbox") {
@@ -4097,17 +4111,6 @@
           });
         }
       }
-
-      const statusValueEl = statusCard.querySelector(".zyrox-autoaim-status");
-      const statusUpdater = setInterval(() => {
-        if (openConfigModule !== "Auto Aim") {
-          clearInterval(statusUpdater);
-          return;
-        }
-        if (statusValueEl) {
-          statusValueEl.textContent = cfg.debugStatus ? autoAimState.statusText : "Hidden";
-        }
-      }, 120);
     } else if (moduleLayout && Array.isArray(moduleLayout.settings)) {
       for (const setting of moduleLayout.settings) {
         const settingCard = document.createElement("div");
