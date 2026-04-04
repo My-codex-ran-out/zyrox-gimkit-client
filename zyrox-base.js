@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.3.3
+// @version      1.3.4
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.3.3";
+    const CLIENT_VERSION = "1.3.4";
     return CLIENT_VERSION;
   }
 
@@ -1148,10 +1148,10 @@
   function getEspRenderConfig() {
     const defaults = {
       hitbox: true,
-      hitboxSize: 80,
+      hitboxSize: 150,
       hitboxWidth: 3,
       hitboxColor: "#ff4444",
-      names: true,
+      names: false,
       namesDistanceOnly: false,
       nameSize: 20,
       nameColor: "#ffffff",
@@ -1622,10 +1622,10 @@
               name: "ESP",
               settings: [
                 { id: "hitbox", label: "Hitbox", type: "checkbox", default: true },
-                { id: "hitboxSize", label: "Hitbox Size", type: "slider", min: 24, max: 270, step: 2, default: 80, unit: "px" },
+                { id: "hitboxSize", label: "Hitbox Size", type: "slider", min: 24, max: 270, step: 2, default: 150, unit: "px" },
                 { id: "hitboxWidth", label: "Hitbox Width", type: "slider", min: 1, max: 10, step: 1, default: 3, unit: "px" },
                 { id: "hitboxColor", label: "Hitbox Color", type: "color", default: "#ff3b3b" },
-                { id: "names", label: "Names", type: "checkbox", default: true },
+                { id: "names", label: "Names", type: "checkbox", default: false },
                 { id: "namesDistanceOnly", label: "Distance Only", type: "checkbox", default: false },
                 { id: "nameSize", label: "Name Size", type: "slider", min: 10, max: 32, step: 1, default: 20, unit: "px" },
                 { id: "nameColor", label: "Name Color", type: "color", default: "#000000" },
@@ -2320,6 +2320,11 @@
     }
     .zyrox-settings-actions { display:flex; justify-content:space-between; align-items:flex-end; gap:8px; padding: 8px 14px 14px; }
     .zyrox-settings-actions-group { display:flex; gap:8px; }
+    .zyrox-settings-action-btn {
+      min-height: 31px;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
     .zyrox-close-btn {
       position: absolute;
       top: 10px;
@@ -2713,8 +2718,8 @@
     </div>
     <div class="zyrox-settings-actions">
       <div class="zyrox-settings-actions-group" style="flex-direction:column;gap:5px;align-items:flex-start;">
-        <button class="zyrox-btn settings-reset" type="button">Reset Appearance</button>
-        <button class="zyrox-btn settings-reset-all" type="button" style="opacity:0.8;">Reset Everything</button>
+        <button class="zyrox-btn zyrox-settings-action-btn settings-reset" type="button">Reset Appearance</button>
+        <button class="zyrox-btn zyrox-settings-action-btn settings-reset-all" type="button" style="opacity:0.8;">Reset All</button>
       </div>
       <div class="zyrox-settings-actions-group">
         <button class="zyrox-btn settings-save" type="button">Save</button>
