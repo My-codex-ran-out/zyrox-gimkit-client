@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.2.3
+// @version      1.2.5
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.2.3";
+    const CLIENT_VERSION = "1.2.5";
     return CLIENT_VERSION;
   }
 
@@ -2606,8 +2606,9 @@
       </div>
     </div>
     <div class="zyrox-settings-actions">
-      <div class="zyrox-settings-actions-group">
+      <div class="zyrox-settings-actions-group" style="flex-direction:column;gap:5px;align-items:flex-start;">
         <button class="zyrox-btn settings-reset" type="button">Reset Appearance</button>
+        <button class="zyrox-btn settings-reset-all" type="button" style="opacity:0.8;">Reset Everything</button>
       </div>
       <div class="zyrox-settings-actions-group">
         <button class="zyrox-btn settings-save" type="button">Save</button>
@@ -2669,6 +2670,7 @@
   const hoverShiftInput = settingsMenu.querySelector(".set-hover-shift");
   const displayModeButtons = [...settingsMenu.querySelectorAll(".set-display-mode")];
   const settingsResetBtn = settingsMenu.querySelector(".settings-reset");
+  const settingsResetAllBtn = settingsMenu.querySelector(".settings-reset-all");
   const settingsCloseBtn = settingsMenu.querySelector(".settings-close");
   const panelByName = new Map();
   const panelCollapseButtons = new Map();
@@ -3775,7 +3777,7 @@
       setPanelCollapsed(panelName, false);
     }
     syncCollapseButtons();
-    setDisplayMode("merged");
+    setDisplayMode("loose");
     const themeTargets = [root.style, configBackdrop.style];
     const removeThemeVar = (name) => {
       for (const target of themeTargets) target.removeProperty(name);
@@ -3823,6 +3825,38 @@
     shell.style.background = "";
     shell.style.transform = "";
     shell.style.backdropFilter = "";
+  });
+
+  settingsResetAllBtn.addEventListener("click", () => {
+    // Nuke localStorage
+    try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+
+    // Reset module enabled state
+    for (const moduleName of [...state.enabledModules]) {
+      toggleModule(moduleName); // toggles off
+    }
+    state.enabledModules.clear();
+    for (const [, item] of state.moduleItems) item.classList.remove("active");
+
+    // Reset all module configs (keybinds + settings)
+    state.moduleConfig = new Map();
+
+    // Reset keybind labels
+    for (const [moduleName, item] of state.moduleItems) {
+      setBindLabel(item, moduleName);
+    }
+
+    // Reset menu keybind
+    CONFIG.toggleKey = CONFIG.defaultToggleKey;
+    settingsMenuKeyBtn.textContent = `Menu Key: ${CONFIG.toggleKey}`;
+    setFooterText();
+
+    // Reset search autofocus
+    state.searchAutofocus = true;
+    searchAutofocusInput.checked = true;
+
+    // Trigger the full appearance reset too
+    settingsResetBtn.click();
   });
 
   settingsSaveBtn.addEventListener("click", () => {
