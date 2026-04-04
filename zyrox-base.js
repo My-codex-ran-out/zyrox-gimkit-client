@@ -9,6 +9,7 @@
 // @updateURL    https://raw.githubusercontent.com/Bob-alt-828100/zyrox-gimkit-client/refs/heads/main/zyrox-base.js
 // @downloadURL  https://raw.githubusercontent.com/Bob-alt-828100/zyrox-gimkit-client/refs/heads/main/zyrox-base.js
 // @icon         https://raw.githubusercontent.com/Bob-alt-828100/zyrox-gimkit-client/refs/heads/main/images/logo.png
+// @license      MIT
 // @grant        none
 // ==/UserScript==
 
