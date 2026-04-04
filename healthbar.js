@@ -22,6 +22,8 @@
     canvas: null,
     ctx: null,
     warnedNoHealth: false,
+    healthPath: null,
+    maxHealthPath: null,
   };
 
   function readNumber(source, paths) {
@@ -32,6 +34,39 @@
       for (const part of parts) node = node?.[part];
       const value = Number(node);
       if (Number.isFinite(value)) return value;
+    }
+    return null;
+  }
+
+  function readByPath(source, path) {
+    if (!source || !path) return null;
+    let node = source;
+    for (const part of path.split(".")) node = node?.[part];
+    const value = Number(node);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function discoverNumericPath(source, matcher, depthLimit = 4) {
+    if (!source || typeof source !== "object") return null;
+    const queue = [{ node: source, path: "", depth: 0 }];
+    const seen = new Set();
+    while (queue.length) {
+      const current = queue.shift();
+      const node = current.node;
+      if (!node || typeof node !== "object") continue;
+      if (seen.has(node)) continue;
+      seen.add(node);
+      for (const key of Object.keys(node)) {
+        const value = node[key];
+        const nextPath = current.path ? `${current.path}.${key}` : key;
+        if (matcher(key, value, nextPath)) {
+          const n = Number(value);
+          if (Number.isFinite(n)) return nextPath;
+        }
+        if (current.depth + 1 < depthLimit && value && typeof value === "object") {
+          queue.push({ node: value, path: nextPath, depth: current.depth + 1 });
+        }
+      }
     }
     return null;
   }
@@ -95,13 +130,56 @@
     let maxHp = null;
     for (const source of sources) {
       if (!source) continue;
-      if (hp == null) hp = readNumber(source, ["health", "hp", "currentHealth", "state.health", "stats.health", "data.health"]);
-      if (maxHp == null) maxHp = readNumber(source, ["maxHealth", "maxHp", "healthMax", "state.maxHealth", "stats.maxHealth", "data.maxHealth"]);
+      if (hp == null) {
+        hp = state.healthPath
+          ? readByPath(source, state.healthPath)
+          : readNumber(source, [
+            "health", "hp", "currentHealth", "currentHp", "life", "lives",
+            "state.health", "state.hp", "state.currentHealth", "state.life",
+            "stats.health", "stats.hp", "data.health", "data.hp",
+          ]);
+      }
+      if (maxHp == null) {
+        maxHp = state.maxHealthPath
+          ? readByPath(source, state.maxHealthPath)
+          : readNumber(source, [
+            "maxHealth", "maxHp", "healthMax", "maxLife",
+            "state.maxHealth", "state.maxHp", "state.healthMax",
+            "stats.maxHealth", "stats.maxHp", "data.maxHealth",
+          ]);
+      }
+      if (hp == null && !state.healthPath) {
+        const path = discoverNumericPath(source, (key, value) => {
+          const k = key.toLowerCase();
+          if (!/(health|hp|life)/.test(k)) return false;
+          const n = Number(value);
+          return Number.isFinite(n) && n >= 0 && n <= 10000;
+        });
+        if (path) {
+          state.healthPath = path;
+          hp = readByPath(source, path);
+        }
+      }
+      if (maxHp == null && !state.maxHealthPath) {
+        const path = discoverNumericPath(source, (key, value) => {
+          const k = key.toLowerCase();
+          if (!/(max.*health|max.*hp|health.*max|max.*life)/.test(k)) return false;
+          const n = Number(value);
+          return Number.isFinite(n) && n > 0 && n <= 10000;
+        });
+        if (path) {
+          state.maxHealthPath = path;
+          maxHp = readByPath(source, path);
+        }
+      }
     }
     if (hp == null) {
       if (!state.warnedNoHealth) {
         state.warnedNoHealth = true;
-        console.warn("[Healthbar Test] no health field found yet; drawing placeholder bars.");
+        console.warn("[Healthbar Test] no health field found yet; drawing placeholder bars.", {
+          discoveredHealthPath: state.healthPath,
+          discoveredMaxPath: state.maxHealthPath,
+        });
       }
       return { hp: 100, maxHp: 100, unknown: true };
     }
