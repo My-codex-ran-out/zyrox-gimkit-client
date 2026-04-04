@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.3.5
+// @version      1.4.0
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.3.5";
+    const CLIENT_VERSION = "1.4.0";
     return CLIENT_VERSION;
   }
 
@@ -1419,6 +1419,12 @@
           }
           ctx.restore();
         }
+      }
+    }
+
+    for (const [id, data] of espState.seenPlayers) {
+      if (!activeIds.has(id) && now - Number(data?.t ?? 0) > 900) {
+        espState.seenPlayers.delete(id);
       }
     }
 
