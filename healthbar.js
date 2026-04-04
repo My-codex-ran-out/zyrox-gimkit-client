@@ -5,6 +5,7 @@
 // @description  Standalone healthbar overlay test for Gimkit players
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
+// @match        https://www.gimkit.com/play*
 // @run-at       document-start
 // @grant        none
 // ==/UserScript==
@@ -20,6 +21,7 @@
     storesPromise: null,
     canvas: null,
     ctx: null,
+    warnedNoHealth: false,
   };
 
   function readNumber(source, paths) {
@@ -71,8 +73,23 @@
     return map.get(id) || map.get(String(id)) || null;
   }
 
+  function findSerializerCharacterByPosition(character) {
+    const map = window?.serializer?.state?.characters?.$items;
+    if (!map || typeof map.values !== "function") return null;
+    const x = Number(character?.x ?? character?.position?.x);
+    const y = Number(character?.y ?? character?.position?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    for (const candidate of map.values()) {
+      const cx = Number(candidate?.x ?? candidate?.position?.x);
+      const cy = Number(candidate?.y ?? candidate?.position?.y);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+      if (Math.abs(cx - x) < 0.5 && Math.abs(cy - y) < 0.5) return candidate;
+    }
+    return null;
+  }
+
   function getHealth(character, fallbackId) {
-    const serializerCharacter = getSerializerCharacterById(character?.id ?? fallbackId);
+    const serializerCharacter = getSerializerCharacterById(character?.id ?? fallbackId) ?? findSerializerCharacterByPosition(character);
     const sources = [character, serializerCharacter];
     let hp = null;
     let maxHp = null;
@@ -81,9 +98,15 @@
       if (hp == null) hp = readNumber(source, ["health", "hp", "currentHealth", "state.health", "stats.health", "data.health"]);
       if (maxHp == null) maxHp = readNumber(source, ["maxHealth", "maxHp", "healthMax", "state.maxHealth", "stats.maxHealth", "data.maxHealth"]);
     }
-    if (hp == null) return null;
+    if (hp == null) {
+      if (!state.warnedNoHealth) {
+        state.warnedNoHealth = true;
+        console.warn("[Healthbar Test] no health field found yet; drawing placeholder bars.");
+      }
+      return { hp: 100, maxHp: 100, unknown: true };
+    }
     if (maxHp == null || maxHp <= 0) maxHp = 100;
-    return { hp: Math.max(0, hp), maxHp: Math.max(1, maxHp) };
+    return { hp: Math.max(0, hp), maxHp: Math.max(1, maxHp), unknown: false };
   }
 
   async function resolveStores() {
@@ -166,15 +189,21 @@
       ctx.fillStyle = "rgba(255, 70, 70, 0.9)";
       ctx.fillRect(bx, by, w, h);
       const grad = ctx.createLinearGradient(bx, by, bx + w, by);
-      grad.addColorStop(0, "#74ff80");
-      grad.addColorStop(1, "#2dcf55");
+      grad.addColorStop(0, health.unknown ? "#bfc7d8" : "#74ff80");
+      grad.addColorStop(1, health.unknown ? "#8693ad" : "#2dcf55");
       ctx.fillStyle = grad;
       ctx.fillRect(bx, by, w * ratio, h);
       ctx.font = "11px Verdana";
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "bottom";
-      ctx.fillText(`${Math.round(health.hp)}/${Math.round(health.maxHp)}`, sx, by - 2);
+      ctx.fillText(
+        health.unknown
+          ? "HP: unknown"
+          : `${Math.round(health.hp)}/${Math.round(health.maxHp)}`,
+        sx,
+        by - 2
+      );
     }
   }
 
