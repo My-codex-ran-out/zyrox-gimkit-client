@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.2.6
+// @version      1.2.7
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.2.6";
+    const CLIENT_VERSION = "1.2.7";
     return CLIENT_VERSION;
   }
 
@@ -2093,6 +2093,8 @@
       overflow: hidden;
       color: var(--zyx-settings-text);
       font-family: var(--zyx-font);
+      display: flex;
+      flex-direction: column;
     }
 
     .zyrox-config {
@@ -2108,7 +2110,7 @@
     .zyrox-settings-header { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.09); background: linear-gradient(90deg, var(--zyx-settings-header-start), var(--zyx-settings-header-end)); }
     .zyrox-settings-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--zyx-settings-text); }
     .zyrox-settings-sub { font-size: 12px; color: var(--zyx-settings-subtext); }
-    .zyrox-settings-layout { display: grid; grid-template-columns: 150px 1fr; min-height: 0; height: 500px; }
+    .zyrox-settings-layout { display: grid; grid-template-columns: 150px 1fr; min-height: 0; flex: 1; }
     .zyrox-settings-sidebar {
       border-right: 1px solid rgba(255,255,255,.08);
       padding: 10px;
