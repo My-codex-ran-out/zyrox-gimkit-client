@@ -2262,16 +2262,16 @@
       onEnable: startCrosshair,
       onDisable: stopCrosshair,
     },
-    "Trigger Assist": {
+    "Triggerbot": {
       onEnable: startTriggerAssist,
       onDisable: stopTriggerAssist,
     },
-    "Auto Aim": {
+    "Aimbot": {
       onEnable: startAutoAim,
       onDisable: stopAutoAim,
     },
   };
-  const WORKING_MODULES = new Set(["Auto Answer", "ESP", "Crosshair", "Trigger Assist", "Auto Aim"]);
+  const WORKING_MODULES = new Set(["Auto Answer", "ESP", "Crosshair", "Triggerbot", "Aimbot"]);
 
   // --- End of Core Utilities ---
 
@@ -2396,7 +2396,7 @@
               ],
             },
             {
-              name: "Trigger Assist",
+              name: "Triggerbot",
               settings: [
                 { id: "enabled",             label: "Enabled",                  type: "checkbox", default: true },
                 { id: "teamCheck",           label: "Ignore Teammates",         type: "checkbox", default: true },
@@ -2409,7 +2409,7 @@
               ],
             },
             {
-              name: "Auto Aim",
+              name: "Aimbot",
               settings: [
                 { id: "enabled",             label: "Enabled",               type: "checkbox", default: true },
                 { id: "teamCheck",           label: "Ignore Teammates",      type: "checkbox", default: true },
@@ -3568,9 +3568,9 @@
     const cfg = store.get(name);
     if (name === "ESP") {
       window.__zyroxEspConfig = { ...getEspRenderConfig(), ...cfg };
-    } else if (name === "Trigger Assist") {
+    } else if (name === "Triggerbot") {
       window.__zyroxTriggerAssistConfig = { ...getTriggerAssistConfig(), ...cfg };
-    } else if (name === "Auto Aim") {
+    } else if (name === "Aimbot") {
       window.__zyroxAutoAimConfig = { ...getAutoAimConfig(), ...cfg };
     }
     return cfg;
@@ -3974,7 +3974,7 @@
         syncCrosshair();
       });
 
-    } else if (moduleName === "Trigger Assist") {
+    } else if (moduleName === "Triggerbot") {
       const defaults = getTriggerAssistConfig();
       Object.assign(cfg, { ...defaults, ...cfg });
       window.__zyroxTriggerAssistConfig = { ...cfg };
@@ -4021,7 +4021,7 @@
           });
         }
       }
-    } else if (moduleName === "Auto Aim") {
+    } else if (moduleName === "Aimbot") {
       const defaults = getAutoAimConfig();
       Object.assign(cfg, { ...defaults, ...cfg });
       window.__zyroxAutoAimConfig = { ...cfg };
