@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.3.9
+// @version      1.4.0
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.3.9";
+    const CLIENT_VERSION = "1.4.0";
     return CLIENT_VERSION;
   }
 
@@ -1184,6 +1184,54 @@
     return defaults;
   }
 
+  function getHealthBarsConfig() {
+    const defaults = {
+      enabled: true,
+      width: 54,
+      height: 6,
+      yOffset: 32,
+      showText: true,
+    };
+    const liveCfg = window.__zyroxHealthBarsConfig;
+    return liveCfg && typeof liveCfg === "object" ? { ...defaults, ...liveCfg } : defaults;
+  }
+
+  function readNumericCandidate(source, paths) {
+    if (!source) return null;
+    for (const path of paths) {
+      const parts = path.split(".");
+      let node = source;
+      for (const part of parts) node = node?.[part];
+      const value = Number(node);
+      if (Number.isFinite(value)) return value;
+    }
+    return null;
+  }
+
+  function getCharacterHealthSnapshot(character, fallbackId = null) {
+    const cid = getCharacterId(character) ?? fallbackId;
+    const serializerCharacter = getSerializerCharacterById(cid) ?? findSerializerCharacterByPosition(character);
+    const candidates = [character, serializerCharacter];
+    let current = null;
+    let max = null;
+    for (const source of candidates) {
+      if (!source) continue;
+      if (current == null) {
+        current = readNumericCandidate(source, ["health", "hp", "currentHealth", "state.health", "stats.health", "data.health"]);
+      }
+      if (max == null) {
+        max = readNumericCandidate(source, ["maxHealth", "maxHp", "healthMax", "state.maxHealth", "stats.maxHealth", "data.maxHealth"]);
+      }
+      if (current != null && max != null) break;
+    }
+    if (current == null) return null;
+    if (max == null || max <= 0) {
+      if (current <= 100) max = 100;
+      else return null;
+    }
+    return { current: Math.max(0, current), max: Math.max(1, max) };
+  }
+
   function renderEspPlayers(stores) {
     const ctx = espState.ctx;
     const canvas = espState.canvas;
@@ -1201,8 +1249,10 @@
 
     const myTeam = getCharacterTeam(me);
     const espCfg = getEspRenderConfig();
+    const healthCfg = getHealthBarsConfig();
     const showHitbox = espCfg.hitbox !== false;
     const showNames = espCfg.names !== false;
+    const showHealthBars = state.enabledModules?.has("Health Bars") && healthCfg.enabled !== false;
     const namesDistanceOnly = espCfg.namesDistanceOnly === true;
     const offscreenStyle = espCfg.offscreenStyle === "arrows" || espCfg.offscreenStyle === "none"
       ? espCfg.offscreenStyle
@@ -1340,6 +1390,42 @@
       const distanceText = `${Math.floor(distance)}`;
       const labelText = namesDistanceOnly ? distanceText : `${getCharacterName(character, characterId)} (${distanceText})`;
       ctx.fillText(labelText, labelX, labelY);
+
+      if (showHealthBars && onScreen) {
+        const hp = getCharacterHealthSnapshot(character, characterId);
+        if (hp) {
+          const barW = Math.max(16, Number(healthCfg.width) || 54);
+          const barH = Math.max(3, Number(healthCfg.height) || 6);
+          const yOffset = Math.max(8, Number(healthCfg.yOffset) || 32);
+          const ratio = Math.max(0, Math.min(1, hp.current / hp.max));
+          const bx = screenX - barW / 2;
+          const by = screenY - yOffset;
+          ctx.save();
+          ctx.fillStyle = "rgba(0,0,0,0.55)";
+          ctx.fillRect(bx - 1, by - 1, barW + 2, barH + 2);
+          ctx.fillStyle = "rgba(255,60,60,0.9)";
+          ctx.fillRect(bx, by, barW, barH);
+          const gradient = ctx.createLinearGradient(bx, by, bx + barW, by);
+          gradient.addColorStop(0, "rgba(110,255,120,0.95)");
+          gradient.addColorStop(1, "rgba(40,200,80,0.95)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(bx, by, barW * ratio, barH);
+          if (healthCfg.showText) {
+            ctx.font = `11px ${espCfg.font || "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"}`;
+            ctx.fillStyle = "#ffffff";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            ctx.fillText(`${Math.round(hp.current)}/${Math.round(hp.max)}`, screenX, by - 2);
+          }
+          ctx.restore();
+        }
+      }
+    }
+
+    for (const [id, data] of espState.seenPlayers) {
+      if (!activeIds.has(id) && now - Number(data?.t ?? 0) > 900) {
+        espState.seenPlayers.delete(id);
+      }
     }
 
     for (const [id, data] of espState.seenPlayers) {
@@ -1970,7 +2056,7 @@
       onDisable: stopTriggerAssist,
     },
   };
-  const WORKING_MODULES = new Set(["Auto Answer", "ESP", "Crosshair", "Trigger Assist"]);
+  const WORKING_MODULES = new Set(["Auto Answer", "ESP", "Health Bars", "Crosshair", "Trigger Assist"]);
 
   // --- End of Core Utilities ---
 
@@ -2045,6 +2131,16 @@
                     { value: "modern", label: "Modern Arrow" },
                   ],
                 },
+              ],
+            },
+            {
+              name: "Health Bars",
+              settings: [
+                { id: "enabled", label: "Enabled", type: "checkbox", default: true },
+                { id: "width", label: "Bar Width", type: "slider", min: 20, max: 120, step: 1, default: 54, unit: "px" },
+                { id: "height", label: "Bar Height", type: "slider", min: 3, max: 18, step: 1, default: 6, unit: "px" },
+                { id: "yOffset", label: "Vertical Offset", type: "slider", min: 8, max: 90, step: 1, default: 32, unit: "px" },
+                { id: "showText", label: "Show HP Text", type: "checkbox", default: true },
               ],
             },
             "HUD",
@@ -3244,6 +3340,8 @@
     const cfg = store.get(name);
     if (name === "ESP") {
       window.__zyroxEspConfig = { ...getEspRenderConfig(), ...cfg };
+    } else if (name === "Health Bars") {
+      window.__zyroxHealthBarsConfig = { ...getHealthBarsConfig(), ...cfg };
     } else if (name === "Trigger Assist") {
       window.__zyroxTriggerAssistConfig = { ...getTriggerAssistConfig(), ...cfg };
     }
