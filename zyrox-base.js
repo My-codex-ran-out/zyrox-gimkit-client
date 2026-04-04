@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.2.9
+// @version      1.3.0
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.2.9";
+    const CLIENT_VERSION = "1.3.0";
     return CLIENT_VERSION;
   }
 
@@ -1443,6 +1443,26 @@
       ctx.beginPath();
       ctx.arc(mx, my, Math.max(1, crosshairSize * 0.35), 0, Math.PI * 2);
       ctx.fill();
+    } else if (style === "solid") {
+      // Solid cross — lines go straight through the center with no gap
+      const arm = crosshairSize;
+      ctx.beginPath();
+      ctx.moveTo(mx - arm, my); ctx.lineTo(mx + arm, my);
+      ctx.moveTo(mx, my - arm); ctx.lineTo(mx, my + arm);
+      ctx.stroke();
+    } else if (style === "crossdot") {
+      // Cross with gap + filled center dot
+      const arm = crosshairSize;
+      const gap = Math.max(1, crosshairSize * 0.4);
+      ctx.beginPath();
+      ctx.moveTo(mx - arm, my); ctx.lineTo(mx - gap, my);
+      ctx.moveTo(mx + gap, my); ctx.lineTo(mx + arm, my);
+      ctx.moveTo(mx, my - arm); ctx.lineTo(mx, my - gap);
+      ctx.moveTo(mx, my + gap); ctx.lineTo(mx, my + arm);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(mx, my, Math.max(1.5, lineSize * 1.2), 0, Math.PI * 2);
+      ctx.fill();
     } else if (style === "circle") {
       ctx.beginPath();
       ctx.arc(mx, my, crosshairSize, 0, Math.PI * 2);
@@ -1450,6 +1470,16 @@
       ctx.beginPath();
       ctx.arc(mx, my, Math.max(1, crosshairSize * 0.2), 0, Math.PI * 2);
       ctx.fill();
+    } else if (style === "circlecross") {
+      // Circle with solid cross lines through the center
+      ctx.beginPath();
+      ctx.arc(mx, my, crosshairSize, 0, Math.PI * 2);
+      ctx.stroke();
+      const arm = crosshairSize;
+      ctx.beginPath();
+      ctx.moveTo(mx - arm, my); ctx.lineTo(mx + arm, my);
+      ctx.moveTo(mx, my - arm); ctx.lineTo(mx, my + arm);
+      ctx.stroke();
     } else if (style === "plus") {
       // Thick plus sign
       ctx.lineWidth = lineSize * 1.5;
@@ -1460,6 +1490,16 @@
       ctx.moveTo(mx + gap, my); ctx.lineTo(mx + arm, my);
       ctx.moveTo(mx, my - arm); ctx.lineTo(mx, my - gap);
       ctx.moveTo(mx, my + gap); ctx.lineTo(mx, my + arm);
+      ctx.stroke();
+    } else if (style === "x") {
+      // Diagonal X crosshair
+      const arm = crosshairSize * 0.75;
+      const gap = Math.max(1, crosshairSize * 0.28);
+      ctx.beginPath();
+      ctx.moveTo(mx - arm, my - arm); ctx.lineTo(mx - gap, my - gap);
+      ctx.moveTo(mx + gap, my + gap); ctx.lineTo(mx + arm, my + arm);
+      ctx.moveTo(mx + arm, my - arm); ctx.lineTo(mx + gap, my - gap);
+      ctx.moveTo(mx - gap, my + gap); ctx.lineTo(mx - arm, my + arm);
       ctx.stroke();
     } else {
       // Default "cross" — thin with center gap
@@ -1598,15 +1638,19 @@
                 { id: "enabled",       label: "Show Crosshair",  type: "checkbox", default: true },
                 { id: "style",         label: "Style",            type: "select",   default: "cross",
                   options: [
-                    { value: "cross",  label: "Cross" },
-                    { value: "dot",    label: "Dot" },
-                    { value: "circle", label: "Circle" },
-                    { value: "plus",   label: "Plus (thick)" },
+                    { value: "cross",       label: "Cross (gap)" },
+                    { value: "solid",       label: "Solid Cross" },
+                    { value: "crossdot",    label: "Cross + Dot" },
+                    { value: "dot",         label: "Dot" },
+                    { value: "circle",      label: "Circle" },
+                    { value: "circlecross", label: "Circle + Cross" },
+                    { value: "plus",        label: "Plus (thick)" },
+                    { value: "x",           label: "X (diagonal)" },
                   ],
                 },
                 { id: "color",         label: "Crosshair Color",  type: "color",    default: "#ff3b3b" },
                 { id: "crosshairSize", label: "Crosshair Size",   type: "slider",   default: 10, min: 4, max: 40, step: 1, unit: "px" },
-                { id: "lineSize",      label: "Line Size",         type: "slider",   default: 2,  min: 1, max: 6,  step: 0.5, unit: "px" },
+                { id: "lineSize",      label: "Cursor Width",      type: "slider",   default: 2,  min: 1, max: 6,  step: 0.5, unit: "px" },
                 { id: "showLine",      label: "Show Line",         type: "checkbox", default: false },
                 { id: "lineColor",     label: "Line Color",        type: "color",    default: "#ff3b3b" },
                 { id: "tracerLineSize", label: "Tracer Thickness", type: "slider",   default: 1.5, min: 0.5, max: 5, step: 0.5, unit: "px" },
@@ -3044,10 +3088,14 @@
       const styleRow = makeRow("Style", `
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <select class="xh-style">
-            <option value="cross"  ${cfg.style === "cross"  ? "selected" : ""}>Cross</option>
-            <option value="dot"    ${cfg.style === "dot"    ? "selected" : ""}>Dot</option>
-            <option value="circle" ${cfg.style === "circle" ? "selected" : ""}>Circle</option>
-            <option value="plus"   ${cfg.style === "plus"   ? "selected" : ""}>Plus (thick)</option>
+            <option value="cross"       ${cfg.style === "cross"       ? "selected" : ""}>Cross (gap)</option>
+            <option value="solid"       ${cfg.style === "solid"       ? "selected" : ""}>Solid Cross</option>
+            <option value="crossdot"    ${cfg.style === "crossdot"    ? "selected" : ""}>Cross + Dot</option>
+            <option value="dot"         ${cfg.style === "dot"         ? "selected" : ""}>Dot</option>
+            <option value="circle"      ${cfg.style === "circle"      ? "selected" : ""}>Circle</option>
+            <option value="circlecross" ${cfg.style === "circlecross" ? "selected" : ""}>Circle + Cross</option>
+            <option value="plus"        ${cfg.style === "plus"        ? "selected" : ""}>Plus (thick)</option>
+            <option value="x"           ${cfg.style === "x"           ? "selected" : ""}>X (diagonal)</option>
           </select>
         </div>
       `);
@@ -3059,7 +3107,7 @@
         </div>
       `);
 
-      const lineSizeRow = makeRow("Line Size", `
+      const lineSizeRow = makeRow("Cursor Width", `
         <div style="display:flex;align-items:center;gap:10px;">
           <input type="range" class="xh-line-size" min="0.5" max="6" step="0.5" value="${cfg.lineSize ?? 2}" style="flex:1;" />
           <span class="xh-line-size-label" style="min-width:36px;text-align:right;font-size:0.85em;opacity:0.75;">${cfg.lineSize ?? 2}px</span>
