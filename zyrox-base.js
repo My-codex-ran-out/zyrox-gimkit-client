@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Zyrox client (gimkit)
 // @namespace    https://github.com/zyrox
-// @version      1.2.8
+// @version      1.2.9
 // @description  Modern UI/menu shell for Zyrox client
 // @author       Zyrox
 // @match        https://www.gimkit.com/join*
@@ -376,7 +376,7 @@
 
   function readUserscriptVersion() {
     // Update this variable whenever you bump @version above.
-    const CLIENT_VERSION = "1.2.8";
+    const CLIENT_VERSION = "1.2.9";
     return CLIENT_VERSION;
   }
 
@@ -1363,8 +1363,11 @@
       enabled: true,
       style: "cross",
       color: "#ff3b3b",
+      crosshairSize: 10,
+      lineSize: 2,
       showLine: false,
       lineColor: "#ff3b3b",
+      tracerLineSize: 1.5,
     };
     const stored = window.__zyroxCrosshairConfig;
     return stored && typeof stored === "object" ? { ...defaults, ...stored } : defaults;
@@ -1411,13 +1414,17 @@
     const cy = canvas.height / 2;
     const col = cfg.color || "#ff3b3b";
 
+    const crosshairSize = typeof cfg.crosshairSize === "number" ? cfg.crosshairSize : 10;
+    const lineSize      = typeof cfg.lineSize      === "number" ? cfg.lineSize      : 2;
+    const tracerSize    = typeof cfg.tracerLineSize === "number" ? cfg.tracerLineSize : 1.5;
+
     // Draw line from center to cursor if enabled
     if (cfg.showLine) {
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(mx, my);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = tracerSize;
       ctx.strokeStyle = cfg.lineColor || "#ff3b3b";
       ctx.globalAlpha = 0.65;
       ctx.stroke();
@@ -1428,26 +1435,26 @@
     ctx.save();
     ctx.strokeStyle = col;
     ctx.fillStyle = col;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = lineSize;
     ctx.globalAlpha = 0.92;
     const style = cfg.style || "cross";
 
     if (style === "dot") {
       ctx.beginPath();
-      ctx.arc(mx, my, 3.5, 0, Math.PI * 2);
+      ctx.arc(mx, my, Math.max(1, crosshairSize * 0.35), 0, Math.PI * 2);
       ctx.fill();
     } else if (style === "circle") {
       ctx.beginPath();
-      ctx.arc(mx, my, 10, 0, Math.PI * 2);
+      ctx.arc(mx, my, crosshairSize, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(mx, my, 2, 0, Math.PI * 2);
+      ctx.arc(mx, my, Math.max(1, crosshairSize * 0.2), 0, Math.PI * 2);
       ctx.fill();
     } else if (style === "plus") {
       // Thick plus sign
-      ctx.lineWidth = 3;
-      const arm = 10;
-      const gap = 3;
+      ctx.lineWidth = lineSize * 1.5;
+      const arm = crosshairSize;
+      const gap = Math.max(1, crosshairSize * 0.3);
       ctx.beginPath();
       ctx.moveTo(mx - arm, my); ctx.lineTo(mx - gap, my);
       ctx.moveTo(mx + gap, my); ctx.lineTo(mx + arm, my);
@@ -1456,8 +1463,8 @@
       ctx.stroke();
     } else {
       // Default "cross" — thin with center gap
-      const arm = 9;
-      const gap = 4;
+      const arm = crosshairSize;
+      const gap = Math.max(1, crosshairSize * 0.4);
       ctx.beginPath();
       ctx.moveTo(mx - arm, my); ctx.lineTo(mx - gap, my);
       ctx.moveTo(mx + gap, my); ctx.lineTo(mx + arm, my);
@@ -1588,8 +1595,8 @@
             {
               name: "Crosshair",
               settings: [
-                { id: "enabled",   label: "Show Crosshair", type: "checkbox", default: true },
-                { id: "style",     label: "Style",          type: "select",   default: "cross",
+                { id: "enabled",       label: "Show Crosshair",  type: "checkbox", default: true },
+                { id: "style",         label: "Style",            type: "select",   default: "cross",
                   options: [
                     { value: "cross",  label: "Cross" },
                     { value: "dot",    label: "Dot" },
@@ -1597,9 +1604,12 @@
                     { value: "plus",   label: "Plus (thick)" },
                   ],
                 },
-                { id: "color",     label: "Crosshair Color", type: "color",    default: "#ff3b3b" },
-                { id: "showLine",  label: "Show Line",        type: "checkbox", default: false },
-                { id: "lineColor", label: "Line Color",       type: "color",    default: "#ff3b3b" },
+                { id: "color",         label: "Crosshair Color",  type: "color",    default: "#ff3b3b" },
+                { id: "crosshairSize", label: "Crosshair Size",   type: "slider",   default: 10, min: 4, max: 40, step: 1, unit: "px" },
+                { id: "lineSize",      label: "Line Size",         type: "slider",   default: 2,  min: 1, max: 6,  step: 0.5, unit: "px" },
+                { id: "showLine",      label: "Show Line",         type: "checkbox", default: false },
+                { id: "lineColor",     label: "Line Color",        type: "color",    default: "#ff3b3b" },
+                { id: "tracerLineSize", label: "Tracer Thickness", type: "slider",   default: 1.5, min: 0.5, max: 5, step: 0.5, unit: "px" },
               ],
             },
           ],
@@ -3042,6 +3052,20 @@
         </div>
       `);
 
+      const sizeRow = makeRow("Crosshair Size", `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="range" class="xh-crosshair-size" min="4" max="40" step="1" value="${cfg.crosshairSize ?? 10}" style="flex:1;" />
+          <span class="xh-crosshair-size-label" style="min-width:36px;text-align:right;font-size:0.85em;opacity:0.75;">${cfg.crosshairSize ?? 10}px</span>
+        </div>
+      `);
+
+      const lineSizeRow = makeRow("Line Size", `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="range" class="xh-line-size" min="0.5" max="6" step="0.5" value="${cfg.lineSize ?? 2}" style="flex:1;" />
+          <span class="xh-line-size-label" style="min-width:36px;text-align:right;font-size:0.85em;opacity:0.75;">${cfg.lineSize ?? 2}px</span>
+        </div>
+      `);
+
       const lineRow = makeRow("Line to Cursor", `
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;">
@@ -3049,6 +3073,13 @@
             Show Line
           </label>
           <input type="color" class="xh-line-color" value="${cfg.lineColor || "#ff3b3b"}" title="Line color" />
+        </div>
+      `);
+
+      const tracerSizeRow = makeRow("Tracer Thickness", `
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="range" class="xh-tracer-size" min="0.5" max="5" step="0.5" value="${cfg.tracerLineSize ?? 1.5}" style="flex:1;" />
+          <span class="xh-tracer-size-label" style="min-width:36px;text-align:right;font-size:0.85em;opacity:0.75;">${cfg.tracerLineSize ?? 1.5}px</span>
         </div>
       `);
 
@@ -3064,12 +3095,30 @@
         cfg.style = e.target.value;
         syncCrosshair();
       });
+      sizeRow.querySelector(".xh-crosshair-size").addEventListener("input", (e) => {
+        const v = Number(e.target.value);
+        cfg.crosshairSize = v;
+        sizeRow.querySelector(".xh-crosshair-size-label").textContent = `${v}px`;
+        syncCrosshair();
+      });
+      lineSizeRow.querySelector(".xh-line-size").addEventListener("input", (e) => {
+        const v = Number(e.target.value);
+        cfg.lineSize = v;
+        lineSizeRow.querySelector(".xh-line-size-label").textContent = `${v}px`;
+        syncCrosshair();
+      });
       lineRow.querySelector(".xh-show-line").addEventListener("change", (e) => {
         cfg.showLine = e.target.checked;
         syncCrosshair();
       });
       lineRow.querySelector(".xh-line-color").addEventListener("input", (e) => {
         cfg.lineColor = e.target.value;
+        syncCrosshair();
+      });
+      tracerSizeRow.querySelector(".xh-tracer-size").addEventListener("input", (e) => {
+        const v = Number(e.target.value);
+        cfg.tracerLineSize = v;
+        tracerSizeRow.querySelector(".xh-tracer-size-label").textContent = `${v}px`;
         syncCrosshair();
       });
 
